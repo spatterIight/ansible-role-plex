@@ -36,12 +36,12 @@ plex_version_environment_variable: docker
 # To enable runtime update of Plex (and thus Plexpass builds) this value must be false
 plex_container_read_only: true
 
-# The path to mount the GPU to inside the container
+# The path where the Intel/AMD GPU is on the host system
+# For NVIDIA GPUs see 'plex_nvidia_visible_devices' and 'plex_container_runtime'
+# https://docs.linuxserver.io/images/docker-plex/#intelatiamd
 plex_gpu_path: "/dev/dri"
 
-# The path to the GPU on the host system. This is typically '/dev/dri' for Intel/AMD GPUs
-# and is used to enable hardware acceleration for video transcoding in Plex.
-#
+# The path to mount the Intel/AMD GPU to in the container.
 # Takes a path value (e.g. "/dev/dri"), or empty string to not mount.
 plex_gpu_bind_path: ""
 
@@ -60,8 +60,7 @@ plex_claim_token: ""
 # https://docs.linuxserver.io/images/docker-plex/#nvidia
 plex_container_runtime: ""
 
-# To enable NVIDIA GPU hardware acceleration this value
-# should either be 'all' or the UUID value of the GPU
+# To enable NVIDIA GPU hardware acceleration this value should either be 'all' or the UUID value of the GPU
 # which can obtained with the command -> 'nvidia-smi --query-gpu=gpu_name,gpu_uuid --format=csv'
 #
 # https://docs.linuxserver.io/images/docker-plex/#nvidia
@@ -74,7 +73,8 @@ plex_data_path: "{{ plex_base_path }}/data"
 plex_media_path: "{{ plex_base_path }}/media"
 
 # The path at which plex_media_path is mounted to inside the container
-plex_media_bind_path: "/media"
+# Takes a path value (e.g. "/media"), or empty string to not mount.
+plex_media_bind_path: ""
 
 plex_container_image: "{{ plex_container_image_registry_prefix }}linuxserver/plex:{{ plex_container_image_tag }}"
 plex_container_image_tag: "{{ plex_version }}"
@@ -151,28 +151,28 @@ plex_container_gdm_port_01: 32410
 
 # Controls whether the container exposes the 'GDM network discovery' port
 # Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32410"), or empty string to not expose.
-plex_container_gdm_bind_port_01: 32410
+plex_container_gdm_bind_port_01: ""
 
 # The port Plex is serving the 'GDM network discovery' server on inside the container
 plex_container_gdm_port_02: 32412
 
 # Controls whether the container exposes the 'GDM network discovery' port
 # Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32412"), or empty string to not expose.
-plex_container_gdm_bind_port_02: 32412
+plex_container_gdm_bind_port_02: ""
 
 # The port Plex is serving the 'GDM network discovery' server on inside the container
 plex_container_gdm_port_03: 32413
 
 # Controls whether the container exposes the 'GDM network discovery' port
 # Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32413"), or empty string to not expose.
-plex_container_gdm_bind_port_03: 32413
+plex_container_gdm_bind_port_03: ""
 
 # The port Plex is serving the 'GDM network discovery' server on inside the container
 plex_container_gdm_port_04: 32414
 
 # Controls whether the container exposes the 'GDM network discovery' port
 # Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32414"), or empty string to not expose.
-plex_container_gdm_bind_port_04: 32414
+plex_container_gdm_bind_port_04: ""
 
 # To inject your own other container labels, see `plex_container_labels_additional_labels`.
 plex_container_labels_traefik_enabled: true
