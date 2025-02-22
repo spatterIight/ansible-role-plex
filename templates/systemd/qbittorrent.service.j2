@@ -1,0 +1,68 @@
+#jinja2: lstrip_blocks: "True"
+[Unit]
+Description=Plex ({{ plex_identifier }})
+{% for service in plex_systemd_required_services_list %}
+Requires={{ service }}
+After={{ service }}
+{% endfor %}
+{% for service in plex_systemd_wanted_services_list %}
+Wants={{ service }}
+{% endfor %}
+
+[Service]
+Type=simple
+Environment="HOME={{ devture_systemd_docker_base_systemd_unit_home_path }}"
+ExecStartPre=-{{ devture_systemd_docker_base_host_command_sh }} -c '{{ devture_systemd_docker_base_host_command_docker }} stop --time={{ plex_container_stop_grace_time_seconds }} {{ plex_identifier }} 2>/dev/null || true'
+ExecStartPre=-{{ devture_systemd_docker_base_host_command_sh }} -c '{{ devture_systemd_docker_base_host_command_docker }} rm {{ plex_identifier }} 2>/dev/null || true'
+
+ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
+			--rm \
+			--name={{ plex_identifier }} \
+			--log-driver=none \
+			--user={{ plex_uid }}:{{ plex_gid }} \
+			--cap-drop=ALL \
+			--cap-add=SETUID \
+			--cap-add=SETGID \
+			--cap-add=CHOWN \
+			--cap-add=FOWNER \
+			--cap-add=DAC_OVERRIDE \
+			--read-only \
+			--network={{ plex_container_network }} \
+			{% if plex_container_webui_bind_port %}
+			-p {{ plex_container_webui_bind_port }}:{{ plex_container_webui_port }} \
+			{% endif %}
+			{% if plex_container_torrenting_bind_port %}
+			-p {{ plex_container_torrenting_bind_port }}:{{ plex_container_torrenting_port }} \
+			{% endif %}
+			{% if plex_container_torrenting_bind_port %}
+			-p {{ plex_container_torrenting_bind_port }}:{{ plex_container_torrenting_port }}/udp \
+			{% endif %}
+			--env-file={{ plex_base_path }}/env \
+			--label-file={{ plex_base_path }}/labels \
+			--mount type=bind,src={{ plex_data_path }},dst=/config \
+			--mount type=bind,src={{ plex_download_path }},dst={{ plex_download_bind_path }} \
+			{% for volume in plex_container_additional_volumes %}
+			--mount type={{ volume.type | default('bind' if '/' in volume.src else 'volume') }},src={{ volume.src }},dst={{ volume.dst }}{{ (',' + volume.options) if volume.options | default('') else '' }} \
+			{% endfor %}
+			# https://docs.linuxserver.io/misc/read-only/#how
+			--tmpfs=/run:rw,exec,nosuid,size=128m \
+			{% for arg in plex_container_extra_arguments %}
+			{{ arg }} \
+			{% endfor %}
+			{{ plex_container_image }}
+
+{% for network in plex_container_additional_networks %}
+ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} network connect {{ network }} {{ plex_identifier }}
+{% endfor %}
+
+ExecStart={{ devture_systemd_docker_base_host_command_docker }} start --attach {{ plex_identifier }}
+
+ExecStop=-{{ devture_systemd_docker_base_host_command_sh }} -c '{{ devture_systemd_docker_base_host_command_docker }} stop --time={{ plex_container_stop_grace_time_seconds }} {{ plex_identifier }} 2>/dev/null || true'
+ExecStop=-{{ devture_systemd_docker_base_host_command_sh }} -c '{{ devture_systemd_docker_base_host_command_docker }} rm {{ plex_identifier }} 2>/dev/null || true'
+
+Restart=always
+RestartSec=30
+SyslogIdentifier={{ plex_identifier }}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,72 @@
+---
+
+- name: Ensure Plex paths exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+    owner: "{{ plex_uid }}"
+    group: "{{ plex_gid }}"
+  with_items:
+    - "{{ plex_base_path }}"
+    - "{{ plex_data_path }}"
+    - "{{ plex_download_path }}"
+
+- name: Ensure Plex support files created
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/{{ item }}.j2"
+    dest: "{{ plex_base_path }}/{{ item }}"
+    owner: "{{ plex_uid }}"
+    group: "{{ plex_gid }}"
+    mode: "0640"
+  with_items:
+    - env
+    - labels
+
+- name: Ensure Plex container image is pulled via community.docker.docker_image
+  when: devture_systemd_docker_base_container_image_pull_method == 'ansible-module'
+  community.docker.docker_image:
+    name: "{{ plex_container_image }}"
+    source: "{{ 'pull' if ansible_version.major > 2 or ansible_version.minor > 7 else omit }}"
+    force_source: "{{ syncthing_container_image_force_pull if ansible_version.major > 2 or ansible_version.minor >= 8 else omit }}"
+    force: "{{ omit if ansible_version.major > 2 or ansible_version.minor >= 8 else syncthing_container_image_force_pull }}"
+  register: image_pull_result
+  retries: "{{ devture_playbook_help_container_retries_count }}"
+  delay: "{{ devture_playbook_help_container_retries_delay }}"
+  until: image_pull_result is not failed
+
+- name: Ensure Plex container image is pulled via command
+  when: devture_systemd_docker_base_container_image_pull_method == 'command'
+  ansible.builtin.command:
+    cmd: "{{ devture_systemd_docker_base_host_command_docker }} pull {{ plex_container_image }}"
+  register: image_pull_result
+  retries: "{{ devture_playbook_help_container_retries_count }}"
+  delay: "{{ devture_playbook_help_container_retries_delay }}"
+  until: image_pull_result is not failed
+  changed_when: "'Downloaded newer image' in image_pull_result.stdout"
+
+- name: Ensure Plex container network is created via community.docker.docker_network
+  when: devture_systemd_docker_base_container_network_creation_method == 'ansible-module'
+  community.general.docker_network:
+    enable_ipv6: "{{ devture_systemd_docker_base_ipv6_enabled }}"
+    name: "{{ plex_container_network }}"
+    driver: bridge
+    driver_options: "{{ devture_systemd_docker_base_container_networks_driver_options }}"
+
+- name: Ensure Plex container network is created via ansible.builtin.command
+  when: devture_systemd_docker_base_container_network_creation_method == 'command'
+  ansible.builtin.command:
+    cmd: >-
+      {{ devture_systemd_docker_base_host_command_docker }} network create
+      {% if devture_systemd_docker_base_ipv6_enabled %}--ipv6{% endif %}
+      {{ devture_systemd_docker_base_container_networks_driver_options_string }}
+      {{ plex_container_network }}
+  register: network_creation_result
+  changed_when: network_creation_result.rc == 0
+  failed_when: network_creation_result.rc != 0 and 'already exists' not in network_creation_result.stderr
+
+- name: Ensure Plex systemd installed
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/systemd/plex.service.j2"
+    dest: "{{ devture_systemd_docker_base_systemd_path }}/{{ plex_identifier }}.service"
+    mode: "0644"

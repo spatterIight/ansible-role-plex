@@ -1,0 +1,26 @@
+---
+
+- name: Check existence of Plex systemd service
+  ansible.builtin.stat:
+    path: "{{ devture_systemd_docker_base_systemd_path }}/{{ plex_identifier }}.service"
+  register: plex_service_stat
+
+- name: Uninstall Plex systemd services and files
+  when: plex_service_stat.stat.exists | bool
+  block:
+    - name: Ensure Plex systemd service is stopped
+      ansible.builtin.service:
+        name: "{{ plex_identifier }}"
+        state: stopped
+        enabled: false
+        daemon_reload: true
+
+    - name: Ensure Plex systemd service does not exist
+      ansible.builtin.file:
+        path: "{{ devture_systemd_docker_base_systemd_path }}/{{ plex_identifier }}.service"
+        state: absent
+
+    - name: Ensure Plex path doesn't exist
+      ansible.builtin.file:
+        path: "{{ plex_base_path }}"
+        state: absent

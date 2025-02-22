@@ -1,0 +1,33 @@
+---
+
+- name: Install Plex
+  tags:
+    - setup-all
+    - setup-plex
+    - install-all
+    - install-plex
+  block:
+    - name: Run Plex validation tasks
+      when: plex_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/validate_config.yml"
+
+    - name: Run Plex installation tasks
+      when: plex_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/install.yml"
+
+- name: Get the Plex temporary password
+  tags:
+    - print-plex-password
+  block:
+    - name: Run Plex print temporary password tasks
+      when: plex_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/print_plex_password.yml"
+
+- name: Uninstall Plex
+  tags:
+    - setup-all
+    - setup-plex
+  block:
+    - name: Run Plex uninstallation tasks
+      when: not plex_enabled | bool
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/uninstall.yml"

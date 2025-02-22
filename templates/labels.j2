@@ -1,0 +1,38 @@
+{% if plex_container_labels_traefik_enabled %}
+traefik.enable=true
+
+{% if plex_container_labels_traefik_docker_network %}
+traefik.docker.network={{ plex_container_labels_traefik_docker_network }}
+{% endif %}
+
+{% set middlewares = [] %}
+
+{% if plex_container_labels_traefik_path_prefix != '/' %}
+traefik.http.middlewares.{{ plex_identifier }}-slashless-redirect.redirectregex.regex=^({{ plex_container_labels_traefik_path_prefix | quote }})$
+traefik.http.middlewares.{{ plex_identifier }}-slashless-redirect.redirectregex.replacement=${1}/
+{% set middlewares = middlewares + [plex_identifier + '-slashless-redirect'] %}
+{% endif %}
+
+{% if plex_container_labels_traefik_path_prefix != '/' %}
+traefik.http.middlewares.{{ plex_identifier }}-strip-prefix.stripprefix.prefixes={{ plex_container_labels_traefik_path_prefix }}
+{% set middlewares = middlewares + [plex_identifier + '-strip-prefix'] %}
+{% endif %}
+
+traefik.http.routers.{{ plex_identifier }}.rule={{ plex_container_labels_traefik_rule }}
+{% if plex_container_labels_traefik_priority | int > 0 %}
+traefik.http.routers.{{ plex_identifier }}.priority={{ plex_container_labels_traefik_priority }}
+{% endif %}
+traefik.http.routers.{{ plex_identifier }}.service={{ plex_identifier }}
+{% if middlewares | length > 0 %}
+traefik.http.routers.{{ plex_identifier }}.middlewares={{ middlewares | join(',') }}
+{% endif %}
+traefik.http.routers.{{ plex_identifier }}.entrypoints={{ plex_container_labels_traefik_entrypoints }}
+traefik.http.routers.{{ plex_identifier }}.tls={{ plex_container_labels_traefik_tls | to_json }}
+{% if plex_container_labels_traefik_tls %}
+traefik.http.routers.{{ plex_identifier }}.tls.certResolver={{ plex_container_labels_traefik_tls_certResolver }}
+{% endif %}
+
+traefik.http.services.{{ plex_identifier }}.loadbalancer.server.port={{ plex_container_webui_port }}
+{% endif %}
+
+{{ plex_container_labels_additional_labels }}
