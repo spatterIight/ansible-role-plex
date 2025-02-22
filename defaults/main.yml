@@ -11,6 +11,18 @@ plex_gid: ''
 plex_timezone: 'Etc/UTC'
 
 plex_version: 1.41.4
+
+# Valid settings for 'plex_version_environment_variable' are:
+#
+# 1. docker: Let Docker handle the Plex Version, we keep our Dockerhub Endpoint up to date with the latest public builds.
+# 2. latest: will update plex to the latest version available that you are entitled to.
+# 3. public: will update plexpass users to the latest public version, useful for plexpass users that don't want to be on the bleeding edge but still want the latest public updates.
+# 4. <specific-version>: will select a specific version (eg 0.9.12.4.1192-9a47d21) of plex to install, note you cannot use this to access plexpass versions if you do not have plexpass.
+#
+# Note -> YOU CANNOT UPDATE TO A PLEXPASS ONLY (BETA) VERSION IF YOU ARE NOT LOGGED IN WITH A PLEXPASS ACCOUNT.
+# https://github.com/linuxserver/docker-plex#application-setup
+plex_version_environment_variable: docker
+
 plex_arch: amd64
 
 # The hostname at which plex is served.
@@ -19,6 +31,15 @@ plex_hostname: ''
 # The path at which plex is served.
 # This value must either be `/` or not end with a slash (e.g. `/plex`).
 plex_path_prefix: /
+
+# The path to mount the GPU to inside the container
+plex_gpu_path: "/dev/dri"
+
+# The path to the GPU on the host system. This is typically '/dev/dri' for Intel/AMD GPUs
+# and is used to enable hardware acceleration for video transcoding in Plex.
+#
+# Takes a path value (e.g. "/dev/dri"), or empty string to not mount.
+plex_gpu_bind_path: ""
 
 plex_base_path: "{{ plex_identifier }}"
 plex_data_path: "{{ plex_base_path }}/data"
