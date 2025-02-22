@@ -31,6 +31,30 @@ ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
 			{% if plex_container_http_bind_port %}
 			-p {{ plex_container_http_bind_port }}:{{ plex_container_http_port }} \
 			{% endif %}
+			{% if plex_container_dlna_udp_bind_port %}
+			-p {{ plex_container_dlna_udp_bind_port }}:{{ plex_container_dlna_udp_port }}/udp \
+			{% endif %}
+			{% if plex_container_dlna_tcp_bind_port %}
+			-p {{ plex_container_dlna_tcp_bind_port }}:{{ plex_container_dlna_tcp_port }} \
+			{% endif %}
+			{% if plex_container_bonjour_bind_port %}
+			-p {{ plex_container_bonjour_bind_port }}:{{ plex_container_bonjour_port }}/udp \
+			{% endif %}
+			{% if plex_container_roku_bind_port %}
+			-p {{ plex_container_roku_bind_port }}:{{ plex_container_roku_port }} \
+			{% endif %}
+			{% if plex_container_gdm_bind_port_01 %}
+			-p {{ plex_container_gdm_bind_port_01 }}:{{ plex_container_gdm_port_01 }}/udp \
+			{% endif %}
+			{% if plex_container_gdm_bind_port_02 %}
+			-p {{ plex_container_gdm_bind_port_02 }}:{{ plex_container_gdm_port_02 }}/udp \
+			{% endif %}
+			{% if plex_container_gdm_bind_port_03 %}
+			-p {{ plex_container_gdm_bind_port_03 }}:{{ plex_container_gdm_port_03 }}/udp \
+			{% endif %}
+			{% if plex_container_gdm_bind_port_04 %}
+			-p {{ plex_container_gdm_bind_port_04 }}:{{ plex_container_gdm_port_04 }}/udp \
+			{% endif %}
 			--env-file={{ plex_base_path }}/env \
 			--label-file={{ plex_base_path }}/labels \
 			--mount type=bind,src={{ plex_data_path }},dst=/config \
