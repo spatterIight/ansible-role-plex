@@ -2,7 +2,7 @@
 galaxy_info:
   author: spatterlight
   role_name: plex
-  description: An Ansible role for installing Plex, a bittorrent client programmed in C++ / Qt that uses libtorrent
+  description: An Ansible role for installing Plex, a personal media server
   platforms:
     - name: Debian
       versions:

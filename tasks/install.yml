@@ -10,7 +10,7 @@
   with_items:
     - "{{ plex_base_path }}"
     - "{{ plex_data_path }}"
-    - "{{ plex_download_path }}"
+    - "{{ plex_media_path }}"
 
 - name: Ensure Plex support files created
   ansible.builtin.template:
