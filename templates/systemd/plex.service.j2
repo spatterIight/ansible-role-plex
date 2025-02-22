@@ -58,7 +58,7 @@ ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
 			-p {{ plex_container_gdm_bind_port_04 }}:{{ plex_container_gdm_port_04 }}/udp \
 			{% endif %}
 			{% if plex_gpu_bind_path %}
-			--device {{ plex_gpu_bind_path }}:{{ plex_gpu_path }} \
+			--device={{ plex_gpu_bind_path }}:{{ plex_gpu_path }} \
 			{% endif %}
 			--env-file={{ plex_base_path }}/env \
 			--label-file={{ plex_base_path }}/labels \
