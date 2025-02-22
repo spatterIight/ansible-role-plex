@@ -15,14 +15,6 @@
       when: plex_enabled | bool
       ansible.builtin.include_tasks: "{{ role_path }}/tasks/install.yml"
 
-- name: Get the Plex temporary password
-  tags:
-    - print-plex-password
-  block:
-    - name: Run Plex print temporary password tasks
-      when: plex_enabled | bool
-      ansible.builtin.include_tasks: "{{ role_path }}/tasks/print_plex_password.yml"
-
 - name: Uninstall Plex
   tags:
     - setup-all
