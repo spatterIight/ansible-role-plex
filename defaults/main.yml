@@ -27,8 +27,8 @@ plex_path_prefix: /
 # 3. public: will update plexpass users to the latest public version, useful for plexpass users that don't want to be on the bleeding edge but still want the latest public updates.
 # 4. <specific-version>: will select a specific version (eg 0.9.12.4.1192-9a47d21) of plex to install, note you cannot use this to access plexpass versions if you do not have plexpass.
 #
-# Note -> You cannot update to a PlexPass only (beta) version if you are not logged in with a PlexPass account
-# Note -> You must set 'plex_container_read_only' to false if you set a value that is not 'docker'
+# NOTE -> You cannot update to a PlexPass only (beta) version if you are not logged in with a PlexPass account
+# NOTE -> You must set 'plex_container_read_only' to false if you set a value that is not 'docker'
 # https://github.com/linuxserver/docker-plex#application-setup
 plex_version_environment_variable: docker
 
@@ -51,6 +51,21 @@ plex_gpu_bind_path: ""
 # Link to obtain -> https://plex.tv/claim
 # Keep in mind that the claim token expires after 4 minutes.
 plex_claim_token: ""
+
+# The container runtime that the container engine should use
+# Should be set to 'nvidia' to enable NVIDIA GPU hardware acceleration,
+# NOTE -> Requires that the https://github.com/NVIDIA/nvidia-container-toolkit is installed
+#
+# If blank the default runtime is used
+# https://docs.linuxserver.io/images/docker-plex/#nvidia
+plex_container_runtime: ""
+
+# To enable NVIDIA GPU hardware acceleration this value
+# should either be 'all' or the UUID value of the GPU
+# which can obtained with the command -> 'nvidia-smi --query-gpu=gpu_name,gpu_uuid --format=csv'
+#
+# https://docs.linuxserver.io/images/docker-plex/#nvidia
+plex_nvidia_visible_devices: ""
 
 plex_base_path: "{{ plex_identifier }}"
 plex_data_path: "{{ plex_base_path }}/data"
