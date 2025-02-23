@@ -10,7 +10,15 @@
   with_items:
     - "{{ plex_base_path }}"
     - "{{ plex_data_path }}"
-    - "{{ plex_media_path }}"
+
+- name: Ensure Plex media path exists
+  ansible.builtin.file:
+    path: "{{ plex_media_path }}"
+    state: directory
+    mode: "0750"
+    owner: "{{ plex_uid }}"
+    group: "{{ plex_gid }}"
+  when: plex_media_bind_path | length == 0
 
 - name: Ensure Plex support files created
   ansible.builtin.template:
