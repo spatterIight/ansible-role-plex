@@ -18,6 +18,9 @@ ExecStartPre=-{{ devture_systemd_docker_base_host_command_sh }} -c '{{ devture_s
 ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
 			--rm \
 			--name={{ plex_identifier }} \
+			{% if plex_container_runtime %}
+			--runtime={{ plex_container_runtime }}
+			{% endif %}
 			--log-driver=none \
 			--user={{ plex_uid }}:{{ plex_gid }} \
 			--cap-drop=ALL \
