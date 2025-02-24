@@ -126,7 +126,7 @@ plex_container_dlna_udp_port: 1900
 plex_container_dlna_udp_bind_port: ""
 
 # The port Plex is serving the DLNA server on inside the container
-plex_container_dlna_tcp_port: 1900
+plex_container_dlna_tcp_port: 32469
 
 # Controls whether the container exposes the 32469 TCP port
 # Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32469"), or empty string to not expose.
