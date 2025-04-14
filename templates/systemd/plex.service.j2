@@ -1,0 +1,96 @@
+#jinja2: lstrip_blocks: "True"
+[Unit]
+Description=Plex ({{ plex_identifier }})
+{% for service in plex_systemd_required_services_list %}
+Requires={{ service }}
+After={{ service }}
+{% endfor %}
+{% for service in plex_systemd_wanted_services_list %}
+Wants={{ service }}
+{% endfor %}
+
+[Service]
+Type=simple
+Environment="HOME={{ devture_systemd_docker_base_systemd_unit_home_path }}"
+ExecStartPre=-{{ devture_systemd_docker_base_host_command_sh }} -c '{{ devture_systemd_docker_base_host_command_docker }} stop -t {{ plex_container_stop_grace_time_seconds }} {{ plex_identifier }} 2>/dev/null || true'
+ExecStartPre=-{{ devture_systemd_docker_base_host_command_sh }} -c '{{ devture_systemd_docker_base_host_command_docker }} rm {{ plex_identifier }} 2>/dev/null || true'
+
+ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
+			--rm \
+			--name={{ plex_identifier }} \
+			{% if plex_container_runtime %}
+			--runtime={{ plex_container_runtime }}
+			{% endif %}
+			--log-driver=none \
+			--user={{ plex_uid }}:{{ plex_gid }} \
+			--cap-drop=ALL \
+			--cap-add=SETUID \
+			--cap-add=SETGID \
+			--cap-add=CHOWN \
+			--cap-add=FOWNER \
+			--cap-add=DAC_OVERRIDE \
+			{% if plex_container_read_only %}
+			--read-only \
+			{% endif %}
+			--network={{ plex_container_network }} \
+			{% if plex_container_http_bind_port %}
+			-p {{ plex_container_http_bind_port }}:{{ plex_container_http_port }} \
+			{% endif %}
+			{% if plex_container_dlna_udp_bind_port %}
+			-p {{ plex_container_dlna_udp_bind_port }}:{{ plex_container_dlna_udp_port }}/udp \
+			{% endif %}
+			{% if plex_container_dlna_tcp_bind_port %}
+			-p {{ plex_container_dlna_tcp_bind_port }}:{{ plex_container_dlna_tcp_port }} \
+			{% endif %}
+			{% if plex_container_bonjour_bind_port %}
+			-p {{ plex_container_bonjour_bind_port }}:{{ plex_container_bonjour_port }}/udp \
+			{% endif %}
+			{% if plex_container_roku_bind_port %}
+			-p {{ plex_container_roku_bind_port }}:{{ plex_container_roku_port }} \
+			{% endif %}
+			{% if plex_container_gdm_bind_port_01 %}
+			-p {{ plex_container_gdm_bind_port_01 }}:{{ plex_container_gdm_port_01 }}/udp \
+			{% endif %}
+			{% if plex_container_gdm_bind_port_02 %}
+			-p {{ plex_container_gdm_bind_port_02 }}:{{ plex_container_gdm_port_02 }}/udp \
+			{% endif %}
+			{% if plex_container_gdm_bind_port_03 %}
+			-p {{ plex_container_gdm_bind_port_03 }}:{{ plex_container_gdm_port_03 }}/udp \
+			{% endif %}
+			{% if plex_container_gdm_bind_port_04 %}
+			-p {{ plex_container_gdm_bind_port_04 }}:{{ plex_container_gdm_port_04 }}/udp \
+			{% endif %}
+			{% if plex_gpu_bind_path %}
+			--device={{ plex_gpu_path }}:{{ plex_gpu_bind_path }} \
+			{% endif %}
+			--env-file={{ plex_base_path }}/env \
+			--label-file={{ plex_base_path }}/labels \
+			--mount type=bind,src={{ plex_data_path }},dst=/config \
+			{% if plex_media_bind_path %}
+			--mount type=bind,src={{ plex_media_path }},dst={{ plex_media_bind_path }} \
+			{% endif %}
+			{% for volume in plex_container_additional_volumes %}
+			--mount type={{ volume.type | default('bind' if '/' in volume.src else 'volume') }},src={{ volume.src }},dst={{ volume.dst }}{{ (',' + volume.options) if volume.options | default('') else '' }} \
+			{% endfor %}
+			# https://docs.linuxserver.io/misc/read-only/#how
+			--tmpfs=/run:rw,exec,nosuid,size=128m \
+			{% for arg in plex_container_extra_arguments %}
+			{{ arg }} \
+			{% endfor %}
+			{{ plex_container_image }}
+
+{% for network in plex_container_additional_networks %}
+ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} network connect {{ network }} {{ plex_identifier }}
+{% endfor %}
+
+ExecStart={{ devture_systemd_docker_base_host_command_docker }} start --attach {{ plex_identifier }}
+
+ExecStop=-{{ devture_systemd_docker_base_host_command_sh }} -c '{{ devture_systemd_docker_base_host_command_docker }} stop --time={{ plex_container_stop_grace_time_seconds }} {{ plex_identifier }} 2>/dev/null || true'
+ExecStop=-{{ devture_systemd_docker_base_host_command_sh }} -c '{{ devture_systemd_docker_base_host_command_docker }} rm {{ plex_identifier }} 2>/dev/null || true'
+
+Restart=always
+RestartSec=30
+SyslogIdentifier={{ plex_identifier }}
+
+[Install]
+WantedBy=multi-user.target
