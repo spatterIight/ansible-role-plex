@@ -10,6 +10,7 @@ plex_uid: ''
 plex_gid: ''
 plex_timezone: 'Etc/UTC'
 
+# renovate: datasource=docker depName=lscr.io/linuxserver/plex versioning=semver
 plex_version: 1.41.6
 plex_arch: amd64
 
