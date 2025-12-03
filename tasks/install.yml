@@ -18,7 +18,7 @@
     mode: "0750"
     owner: "{{ plex_uid }}"
     group: "{{ plex_gid }}"
-  when: plex_media_bind_path
+  when: plex_media_bind_path | length > 0
 
 - name: Ensure Plex support files created
   ansible.builtin.template:
