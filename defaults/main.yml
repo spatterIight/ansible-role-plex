@@ -86,7 +86,9 @@ plex_media_bind_path: ""
 
 plex_container_image: "{{ plex_container_image_registry_prefix }}linuxserver/plex:{{ plex_container_image_tag }}"
 plex_container_image_tag: "{{ plex_version }}"
-plex_container_image_registry_prefix: lscr.io/
+plex_container_image_registry_prefix: "{{ plex_container_image_registry_prefix_upstream }}"
+plex_container_image_registry_prefix_upstream: "{{ plex_container_image_registry_prefix_upstream_default }}"
+plex_container_image_registry_prefix_upstream_default: lscr.io/
 
 # The base container network. It will be auto-created by this role if it doesn't exist already.
 plex_container_network: "{{ plex_identifier }}"
