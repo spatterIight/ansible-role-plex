@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2023-2026 Slavi Pantaleev
 # SPDX-FileCopyrightText: 2025 spatterIight
-# SPDX-FileCopyrightText: 2026 Suguru Hirahara
+# SPDX-FileCopyrightText: 2025, 2026 Suguru Hirahara
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -30,40 +30,42 @@
   ansible.builtin.template:
     src: "{{ role_path }}/templates/{{ item }}.j2"
     dest: "{{ plex_base_path }}/{{ item }}"
+    mode: "0640"
     owner: "{{ plex_uid }}"
     group: "{{ plex_gid }}"
-    mode: "0640"
   with_items:
     - env
     - labels
+  register: plex_support_files_result
 
-- name: Ensure Plex container image is pulled via community.docker.docker_image
+- name: Ensure Plex container image is pulled via community.docker.docker_image_pull
   when: devture_systemd_docker_base_container_image_pull_method == 'ansible-module'
   community.docker.docker_image_pull:
     name: "{{ plex_container_image }}"
     pull: always
-  register: image_pull_result
+  register: plex_container_image_pull_result_ansible_module
   retries: "{{ devture_playbook_help_container_retries_count }}"
   delay: "{{ devture_playbook_help_container_retries_delay }}"
-  until: image_pull_result is not failed
+  until: plex_container_image_pull_result_ansible_module is not failed
 
-- name: Ensure Plex container image is pulled via command
+- name: Ensure Plex container image is pulled via ansible.builtin.command
   when: devture_systemd_docker_base_container_image_pull_method == 'command'
   ansible.builtin.command:
     cmd: "{{ devture_systemd_docker_base_host_command_docker }} pull {{ plex_container_image }}"
-  register: image_pull_result
+  register: plex_container_image_pull_result_command
   retries: "{{ devture_playbook_help_container_retries_count }}"
   delay: "{{ devture_playbook_help_container_retries_delay }}"
-  until: image_pull_result is not failed
-  changed_when: "'Downloaded newer image' in image_pull_result.stdout"
+  until: plex_container_image_pull_result_command is not failed
+  changed_when: "'Downloaded newer image' in plex_container_image_pull_result_command.stdout"
 
 - name: Ensure Plex container network is created via community.docker.docker_network
   when: devture_systemd_docker_base_container_network_creation_method == 'ansible-module'
-  community.general.docker_network:
+  community.docker.docker_network:
     enable_ipv6: "{{ devture_systemd_docker_base_ipv6_enabled }}"
     name: "{{ plex_container_network }}"
     driver: bridge
     driver_options: "{{ devture_systemd_docker_base_container_networks_driver_options }}"
+  register: plex_network_creation_result
 
 - name: Ensure Plex container network is created via ansible.builtin.command
   when: devture_systemd_docker_base_container_network_creation_method == 'command'
@@ -73,12 +75,23 @@
       {% if devture_systemd_docker_base_ipv6_enabled %}--ipv6{% endif %}
       {{ devture_systemd_docker_base_container_networks_driver_options_string }}
       {{ plex_container_network }}
-  register: network_creation_result
-  changed_when: network_creation_result.rc == 0
-  failed_when: network_creation_result.rc != 0 and 'already exists' not in network_creation_result.stderr
+  register: plex_network_creation_result
+  changed_when: plex_network_creation_result.rc == 0
+  failed_when: plex_network_creation_result.rc != 0 and 'already exists' not in plex_network_creation_result.stderr
 
-- name: Ensure Plex systemd installed
+- name: Ensure Plex systemd service is present
   ansible.builtin.template:
     src: "{{ role_path }}/templates/systemd/plex.service.j2"
     dest: "{{ devture_systemd_docker_base_systemd_path }}/{{ plex_identifier }}.service"
     mode: "0644"
+  register: plex_systemd_service_result
+
+- name: Determine whether Plex needs a restart
+  ansible.builtin.set_fact:
+    plex_restart_necessary: >-
+      {{
+        plex_support_files_result.changed | default(false)
+        or plex_systemd_service_result.changed | default(false)
+        or plex_container_image_pull_result_ansible_module.changed | default(false)
+        or plex_container_image_pull_result_command.changed | default(false)
+      }}
