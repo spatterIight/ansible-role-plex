@@ -13,13 +13,22 @@
 plex_enabled: true
 
 plex_identifier: plex
+plex_base_path: "/{{ plex_identifier }}"
+plex_data_path: "{{ plex_base_path }}/data"
 
-plex_uid: ""
-plex_gid: ""
+# The path where media files are stored on the host system
+plex_media_path: "{{ plex_base_path }}/media"
+
+# The path at which plex_media_path is mounted to inside the container
+# Takes a path value (e.g. "/media"), or empty string to not mount.
+plex_media_bind_path: ""
 
 # renovate: datasource=docker depName=lscr.io/linuxserver/plex versioning=semver
 plex_version: 1.43.1
 plex_arch: amd64
+
+plex_uid: ""
+plex_gid: ""
 
 # The hostname at which plex is served.
 plex_hostname: ""
@@ -73,16 +82,6 @@ plex_container_runtime: ""
 #
 # https://docs.linuxserver.io/images/docker-plex/#nvidia
 plex_nvidia_visible_devices: ""
-
-plex_base_path: "{{ plex_identifier }}"
-plex_data_path: "{{ plex_base_path }}/data"
-
-# The path where media files are stored on the host system
-plex_media_path: "{{ plex_base_path }}/media"
-
-# The path at which plex_media_path is mounted to inside the container
-# Takes a path value (e.g. "/media"), or empty string to not mount.
-plex_media_bind_path: ""
 
 plex_container_image: "{{ plex_container_image_registry_prefix }}linuxserver/plex:{{ plex_container_image_tag }}"
 plex_container_image_tag: "{{ plex_version }}"
