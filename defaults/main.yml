@@ -89,9 +89,6 @@ plex_container_image_registry_prefix: "{{ plex_container_image_registry_prefix_u
 plex_container_image_registry_prefix_upstream: "{{ plex_container_image_registry_prefix_upstream_default }}"
 plex_container_image_registry_prefix_upstream_default: lscr.io/
 
-# The base container network. It will be auto-created by this role if it doesn't exist already.
-plex_container_network: "{{ plex_identifier }}"
-
 # A list of additional container networks that the container would be connected to.
 # The role does not create these networks, so make sure they already exist.
 plex_container_additional_networks: "{{ (plex_container_additional_networks_default + plex_container_additional_networks_auto + plex_container_additional_networks_custom) | unique }}"
@@ -110,6 +107,12 @@ plex_systemd_wanted_services_list: "{{ (plex_systemd_wanted_services_list_defaul
 plex_systemd_wanted_services_list_default: []
 plex_systemd_wanted_services_list_auto: []
 plex_systemd_wanted_services_list_custom: []
+
+# The base container network. It will be auto-created by this role if it doesn't exist already.
+plex_container_network: "{{ plex_identifier }}"
+
+# Control if the container network is deleted on uninstalling.
+plex_container_network_deletion_enabled: true
 
 # For information on all the ports Plex may use, and what they do, see the below docs
 # https://github.com/linuxserver/docker-plex#optional-parameters
