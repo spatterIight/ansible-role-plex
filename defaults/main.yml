@@ -17,7 +17,6 @@ plex_identifier: plex
 
 plex_uid: ''
 plex_gid: ''
-plex_timezone: 'Etc/UTC'
 
 # renovate: datasource=docker depName=lscr.io/linuxserver/plex versioning=semver
 plex_version: 1.43.1
@@ -204,14 +203,6 @@ plex_container_labels_traefik_tls_certResolver: default  # noqa var-naming
 #   another.label="here"
 plex_container_labels_additional_labels: ''
 
-# plex_container_additional_environment_variables contains a multiline string with additional environment variables to pass to the container.
-#
-# Example:
-# plex_container_additional_environment_variables: |
-#   VAR=1
-#   ANOTHER=value
-plex_container_additional_environment_variables: ''
-
 # A list of additional "volumes" to mount in the container.
 #
 # See the `--mount` documentation for the `docker run` command.
@@ -229,6 +220,48 @@ plex_container_additional_volumes: []
 
 # A list of extra arguments to pass to the container
 plex_container_extra_arguments: []
+
+# Controls how long to wait for the container to stop gracefully before killing it.
+plex_container_stop_grace_time_seconds: "{{ devture_systemd_docker_base_container_stop_grace_time_seconds }}"
+
+# Controls how long the pre-start cleanup should wait for stale container-name release
+# before failing startup explicitly.
+plex_container_cleanup_timeout_seconds: "{{ devture_systemd_docker_base_container_cleanup_timeout_seconds }}"
+
+# Controls the delay between pre-start cleanup retries.
+plex_container_cleanup_retry_delay_seconds: "{{ devture_systemd_docker_base_container_cleanup_retry_delay_seconds }}"
+
+# Shell command used in the systemd pre-start phase to deterministically remove a stale
+# container and wait until Docker releases its name.
+plex_container_cleanup_command: |
+  i=0;
+  while [ "$i" -lt {{ plex_container_cleanup_timeout_seconds }} ]; do
+  {{ devture_systemd_docker_base_host_command_docker }} stop -t {{ plex_container_stop_grace_time_seconds }} {{ plex_identifier }} >/dev/null 2>&1 || true;
+  {{ devture_systemd_docker_base_host_command_docker }} rm -f {{ plex_identifier }} >/dev/null 2>&1 || true;
+  if {{ devture_systemd_docker_base_host_command_docker }} container inspect {{ plex_identifier }} >/dev/null 2>&1; then
+  i=$((i + 1));
+  sleep {{ plex_container_cleanup_retry_delay_seconds }};
+  continue;
+  fi;
+  if {{ devture_systemd_docker_base_host_command_docker }} info >/dev/null 2>&1; then
+  exit 0;
+  fi;
+  echo "Failed to query Docker daemon while cleaning up {{ plex_identifier }}" >&2;
+  exit 1;
+  done;
+  echo "Failed to remove stale container {{ plex_identifier }} after {{ plex_container_cleanup_timeout_seconds }} attempts" >&2;
+  exit 1
+
+# Specify the timezone
+plex_timezone: 'Etc/UTC'
+
+# plex_environment_variables_additional_variables contains a multiline string with additional environment variables to pass to the container.
+#
+# Example:
+# plex_environment_variables_additional_variables: |
+#   VAR=1
+#   ANOTHER=value
+plex_environment_variables_additional_variables: ''
 
 # plex_restart_necessary controls whether the Plex systemd
 # service will be restarted (when true) or merely started (when false) by the
