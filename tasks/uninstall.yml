@@ -1,5 +1,10 @@
----
+# SPDX-FileCopyrightText: 2023 Slavi Pantaleev
+# SPDX-FileCopyrightText: 2025 spatterIight
+# SPDX-FileCopyrightText: 2025, 2026 Suguru Hirahara
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
 
+---
 - name: Check existence of Plex systemd service
   ansible.builtin.stat:
     path: "{{ devture_systemd_docker_base_systemd_path }}/{{ plex_identifier }}.service"
@@ -20,7 +25,86 @@
         path: "{{ devture_systemd_docker_base_systemd_path }}/{{ plex_identifier }}.service"
         state: absent
 
-    - name: Ensure Plex path doesn't exist
+    - name: Ensure Plex support files do not exist
       ansible.builtin.file:
-        path: "{{ plex_base_path }}"
+        path: "{{ plex_base_path }}/{{ item }}"
         state: absent
+      with_items:
+        - env
+        - labels
+
+    - name: Ensure Plex local data path does not exist if empty
+      ansible.builtin.command:
+        cmd: "rmdir {{ plex_data_path }}"
+      register: plex_data_path_deletion_result
+      changed_when: plex_data_path_deletion_result.rc == 0
+      failed_when: false
+
+    - name: Ensure Plex local media path does not exist if empty
+      ansible.builtin.command:
+        cmd: "rmdir {{ plex_media_path }}"
+      register: plex_media_path_deletion_result
+      changed_when: plex_media_path_deletion_result.rc == 0
+      failed_when: false
+
+    - name: Ensure Plex base path does not exist if empty
+      ansible.builtin.command:
+        cmd: "rmdir {{ plex_base_path }}"
+      register: plex_base_path_deletion_result
+      changed_when: plex_base_path_deletion_result.rc == 0
+      failed_when: false
+
+    - name: Ensure Plex container network does not exist
+      when: plex_container_network_deletion_enabled
+      block:
+        - name: Ensure Plex container network does not exist via community.docker.docker_network
+          when: devture_systemd_docker_base_container_network_creation_method == 'ansible-module'
+          community.docker.docker_network:
+            name: "{{ plex_container_network }}"
+            state: absent
+          register: plex_network_deletion_result
+
+        - name: Ensure Plex container network does not exist via ansible.builtin.command
+          when: devture_systemd_docker_base_container_network_creation_method == 'command'
+          ansible.builtin.command:
+            cmd: >-
+              {{ devture_systemd_docker_base_host_command_docker }} network rm
+              {{ plex_container_network }}
+          register: plex_network_deletion_result
+          changed_when: plex_container_network in plex_network_deletion_result.stdout
+
+- name: Check existence of Plex local data path
+  ansible.builtin.stat:
+    path: "{{ plex_data_path }}"
+  register: plex_data_path_stat
+
+# We just want to notify the user. Deleting data is too destructive.
+- name: Inject the message about the remaining Plex local data path
+  when: plex_data_path_stat.stat.exists | bool
+  ansible.builtin.set_fact:
+    devture_playbook_runtime_messages_list: |
+      {{
+        devture_playbook_runtime_messages_list | default([])
+        +
+        [
+          "Note: As the local Plex instance has been removed, some old data remains in `" + plex_data_path + "`. Feel free to delete it."
+        ]
+      }}
+
+- name: Check existence of Plex local media path
+  ansible.builtin.stat:
+    path: "{{ plex_media_path }}"
+  register: plex_media_path_stat
+
+# We just want to notify the user. Deleting data is too destructive.
+- name: Inject the message about the remaining Plex local media path
+  when: plex_media_path_stat.stat.exists | bool
+  ansible.builtin.set_fact:
+    devture_playbook_runtime_messages_list: |
+      {{
+        devture_playbook_runtime_messages_list | default([])
+        +
+        [
+          "Note: As the local Plex instance has been removed, media files remain in `" + plex_media_path + "`. Feel free to delete it."
+        ]
+      }}
