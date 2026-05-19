@@ -24,7 +24,7 @@ plex_media_path: "{{ plex_base_path }}/media"
 plex_media_bind_path: ""
 
 # renovate: datasource=docker depName=lscr.io/linuxserver/plex versioning=semver
-plex_version: 1.43.1
+plex_version: 1.43.2
 plex_arch: amd64
 
 plex_uid: ""
