@@ -9,10 +9,14 @@ version = 1
 path = [
     ".ansible-lint",
     ".github/renovate.json",
+    ".github/workflows/molecule.yml",
     ".gitignore",
     ".pre-commit-config.yaml",
+    ".python-version",
     ".yamllint.yml",
-    "meta/main.yml"
+    "meta/main.yml",
+    "molecule/requirements.txt",
+    "molecule/**/requirements.yml"
 ]
 SPDX-FileCopyrightText = "NONE"
 SPDX-License-Identifier = "CC0-1.0"
