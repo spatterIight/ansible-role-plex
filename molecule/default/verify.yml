@@ -3,12 +3,12 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-- name: Verify
+- name: Verify Plex systemd service
   hosts: all
   become: true
   gather_facts: false
   tasks:
-    - name: Wait for plex service to become active (up to 180s)
+    - name: Wait for Plex service to become active (up to 180s)
       ansible.builtin.systemd:
         name: plex.service
       register: plex_service
@@ -16,7 +16,7 @@
       retries: 36
       delay: 5
 
-    - name: Assert plex service is active
+    - name: Assert Plex service is active
       ansible.builtin.assert:
         that: plex_service.status.ActiveState == 'active'
         fail_msg: "plex.service not active ({{ plex_service.status.ActiveState }})"
@@ -28,19 +28,19 @@
         method: GET
         status_code: [200, 401]
         follow_redirects: none
-      register: plex_http
-      until: plex_http.status in [200, 401]
+      register: plex_endpoint_http
+      until: plex_endpoint_http.status in [200, 401]
       retries: 120
       delay: 5
 
     - name: Assert Plex HTTP endpoint responds
       ansible.builtin.assert:
-        that: plex_http.status in [200, 401]
-        fail_msg: "Plex did not respond with 200 or 401 ({{ plex_http.status | default('no response') }})"
-        success_msg: "Plex responded with {{ plex_http.status }}"
+        that: plex_endpoint_http.status in [200, 401]
+        fail_msg: "Plex did not respond with 200 or 401 ({{ plex_endpoint_http.status | default('no response') }})"
+        success_msg: "Plex responded with {{ plex_endpoint_http.status }}"
 
-    - name: Show service status summary
+    - name: Show Plex systemd service status summary
       ansible.builtin.debug:
         msg:
-          - "plex systemd: {{ plex_service.status.ActiveState }}"
-          - "plex HTTP: {{ plex_http.status }}"
+          - "Plex systemd: {{ plex_service.status.ActiveState }}"
+          - "Plex HTTP: {{ plex_endpoint_http.status }}"
