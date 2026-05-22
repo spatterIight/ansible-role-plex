@@ -30,10 +30,10 @@ plex_arch: amd64
 plex_uid: ""
 plex_gid: ""
 
-# The hostname at which plex is served.
+# The hostname at which Plex is served.
 plex_hostname: ""
 
-# The path at which plex is served.
+# The path at which Plex is served.
 # This value must either be `/` or not end with a slash (e.g. `/plex`).
 plex_path_prefix: /
 
