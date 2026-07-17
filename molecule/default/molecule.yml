@@ -28,6 +28,10 @@ provisioner:
   inventory:
     group_vars:
       all:
+        # Helper variables
+        plex_debug_service_enabled: false
+
+        # Variables for Plex
         plex_uid: 1000
         plex_gid: 1000
         plex_hostname: plex
