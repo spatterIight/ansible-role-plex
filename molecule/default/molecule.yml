@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 # SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Suguru Hirahara
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -32,6 +33,7 @@ provisioner:
       all:
         # Helper variables
         plex_debug_service_enabled: false
+        plex_restarts_check_enabled: true
 
         # `plex_data_path` is derived through Jinja, so verify.yml (where the
         # role is not in scope) cannot resolve it. The value the role's
