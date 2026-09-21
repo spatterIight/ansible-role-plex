@@ -43,32 +43,29 @@ pip3 install -r ./molecule/requirements.txt
 
 ## What the suite can and cannot tell you
 
-Read this before changing anything under `molecule/`. Plex Media Server is proprietary software, and that puts a hard ceiling on what an automated suite is allowed to claim.
+Plex Media Server is proprietary software, and that puts a hard ceiling on what an automated suite is allowed to claim.
 
-**A Plex server has to be claimed to a Plex account to be of any use**, and claiming needs a `PLEX_CLAIM` token from <https://plex.tv/claim>. Those tokens are bound to a person's Plex account and expire about four minutes after they are issued. CI cannot hold one, and this role's scenario does not pretend otherwise: every run leaves an **unclaimed** server, and `verify.yml` asserts that it is unclaimed (`claimed="0"` on `/identity`) rather than quietly hoping so.
+**A Plex server has to be claimed to a Plex account to be of any use**, and claiming needs a `PLEX_CLAIM` token from <https://plex.tv/claim>. Those tokens are bound to a person's Plex account. GitHub CI runners cannot hold one, and this role's scenario does not pretend otherwise: every run leaves an **unclaimed** server, and `verify.yml` asserts that it is unclaimed (`claimed="0"` on `/identity`).
 
-Everything on the far side of that boundary is therefore **out of scope and untested**: signing in, adding libraries, scanning media, metadata agents, transcoding (hardware or otherwise), Plex Pass builds, DLNA, and the `plex_version_environment_variable` values other than `docker` (`latest` / `public` / a specific version), which make Plex update itself at runtime and require `plex_container_read_only: false`.
+Everything which requires the Plex account is therefore out of scope: signing in, adding libraries, scanning media, metadata agents, transcoding (hardware or otherwise), and so on.
 
-What an unclaimed server *does* do turns out to be enough to test the role itself. Run by hand before any of this was written, `lscr.io/linuxserver/plex` starts, serves HTTP on 32400 and answers `/identity` without authentication, with both the running version and the server's `machineIdentifier`. Two things about it shaped the scenario:
+What an unclaimed server *does* do turns out to be enough to test the role itself. Run by hand before any of this was written, `lscr.io/linuxserver/plex` starts, serves HTTP on 32400 and answers `/identity` without authentication, with both the running version and the server's `machineIdentifier`.
 
-- **Plex answers `200` on every path.** `/zzz-does-not-exist` returns an empty `MediaContainer`, not a 404. "GET `/` returned 200" is worth nothing on its own; the scenario this replaced accepted `200 or 401` on `/`, which any HTTP server in the world satisfies.
-- **The systemd unit says `active` regardless.** `Restart=always` means a crash-looping container still presents an `active` unit, so the unit's restart counter is asserted alongside its state.
+Here is a list of what a successful run proves:
 
-So what a green run proves is:
-
-- **that the pinned version is the running one.** `/identity` reports a four-component Plex version (`1.43.3.10896-cb3ebc72d`) while the linuxserver.io tag the role pins has three (`1.43.3`), so the pinned value is matched as a prefix with a trailing dot. The container's image reference is checked against `plex_version` as well. This is what a version bump has to survive.
-- **that the server being probed is the one the role deployed.** Plex writes its `machineIdentifier` into `Library/Application Support/Plex Media Server/Preferences.xml` under `/config`. The scenario reads that file from the host, through `plex_data_path`, and asserts it matches what `/identity` returned. A Plex using some other directory, or some other HTTP server answering on the port, fails here.
-- **that the role's configuration reaches the process.** `PUID`, `PGID`, `TZ` and `VERSION` are checked in the container's environment, and the timezone is read back from inside the container as a UTC offset (`Pacific/Kiritimati`, `+1400`, is nothing the image would produce by itself). The files Plex creates are checked to be owned by `plex_uid`:`plex_gid`, which are deliberately neither `root` nor the `1000` the image defaults to.
-- **that the container is built the way the role's variables say.** The published ports (deliberately different numbers from the container ports, so a dropped variable publishes nothing), the read-only root filesystem and its `tmpfs` `/run`, the data and media bind mounts, `plex_container_additional_volumes` (read back from inside the container, because an entry that is silently dropped looks exactly like one that worked), `plex_container_additional_networks`, `plex_container_extra_arguments` and `plex_container_labels_additional_labels`.
-- **that the Traefik labels describe what was deployed** — hostname, path prefix, both path-prefix middlewares and the load balancer port — and that `templates/labels.j2` emits *nothing* Traefik-related when `plex_container_labels_traefik_enabled` is `false`, which is checked by rendering the template a second time.
-- **that `plex_claim_token` is plumbed through.** No real token exists here, so `templates/env.j2` is rendered out of band with a stand-in value and checked to produce a `PLEX_CLAIM` line, while the env file the role really wrote is checked to contain no `PLEX_CLAIM` at all — an empty `PLEX_CLAIM=` is not the same thing as none.
-- **that the env and label files are `0640`, owned by `plex_uid`:`plex_gid`.** The env file is where a claim token would land, so its mode is part of this role's security surface.
+- **The pinned version is the running one**: `/identity` reports a four-component Plex version (`1.43.3.10896-cb3ebc72d`) while the linuxserver.io tag the role pins has three (`1.43.3`), so the pinned value is matched as a prefix with a trailing dot. The container's image reference is checked against `plex_version` as well.
+- **The server being probed is the one the role deployed**: Plex writes its `machineIdentifier` into `Library/Application Support/Plex Media Server/Preferences.xml` under `/config`. The scenario reads that file from the host, through `plex_data_path`, and asserts it matches what `/identity` returned.
+- **The role's configuration reaches the process**: `PUID`, `PGID`, `TZ` and `VERSION` are checked in the container's environment, and the timezone is read back from inside the container as a UTC offset. The files Plex creates are checked to be owned by `plex_uid`:`plex_gid`, which are deliberately neither `root` nor the `1000` the image defaults to.
+- **The container is built the way the role's variables say**: The published ports (deliberately different numbers from the container ports, so a dropped variable publishes nothing), the read-only root filesystem and its `tmpfs` `/run`, the data and media bind mounts, `plex_container_additional_volumes` (read back from inside the container, because an entry that is silently dropped looks exactly like one that worked), `plex_container_additional_networks`, `plex_container_extra_arguments` and `plex_container_labels_additional_labels`.
+- **The Traefik labels describe what was deployed** — hostname, path prefix, both path-prefix middlewares and the load balancer port — and that `templates/labels.j2` emits *nothing* Traefik-related when `plex_container_labels_traefik_enabled` is `false`.
+- **`plex_claim_token` is plumbed through**: No real token exists here, so `templates/env.j2` is rendered out of band with a stand-in value and checked to produce a `PLEX_CLAIM` line, while the env file the role really wrote is checked to contain no `PLEX_CLAIM` at all — an empty `PLEX_CLAIM=` is not the same thing as none.
+- **The env and label files are `0640`, owned by `plex_uid`:`plex_gid`**: The env file is where a claim token would land, so its mode is part of this role's security surface.
 
 What it does not prove:
 
-- **that an upgrade works.** The scenario always starts from an empty `/config`. Plex migrates its library database in place on the first start of a new build, and nothing here has a library to migrate. This is why patch-level Renovate updates are not automerged; see `.github/renovate.json`.
-- **that `plex_container_http_port` can be changed.** It cannot: Plex Media Server always listens on 32400 inside the container. The variable describes where the application is, and the scenario checks that the port mapping and the Traefik load balancer follow it — not that Plex moves.
-- **anything about GPU transcoding.** `plex_gpu_bind_path`, `plex_container_runtime` and `plex_nvidia_visible_devices` need hardware the CI runners do not have.
+- **Upgrade works**: The scenario always starts from an empty `/config`. Plex migrates its library database in place on the first start of a new build, and nothing here has a library to migrate. This is why patch-level Renovate updates are not automerged; see `.github/renovate.json`.
+- **`plex_container_http_port` can be changed**: Plex Media Server always listens on 32400 inside the container.
+- **anything about GPU transcoding.** `plex_gpu_bind_path`, `plex_container_runtime` and `plex_nvidia_visible_devices` need hardware the GitHub CI runners do not have.
 
 ## Scenarios
 
