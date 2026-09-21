@@ -209,7 +209,7 @@
 
         - name: Inspect the Plex container
           ansible.builtin.command:
-            cmd: "docker container inspect {{ plex_defaults.plex_identifier }}"
+            cmd: docker container inspect plex
           register: plex_container_raw
           changed_when: false
 
