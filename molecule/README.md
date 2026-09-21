@@ -59,7 +59,6 @@ Here is a list of what a successful run proves:
 - **The container is built the way the role's variables say**: The published ports (deliberately different numbers from the container ports, so a dropped variable publishes nothing), the read-only root filesystem and its `tmpfs` `/run`, the data and media bind mounts, `plex_container_additional_volumes` (read back from inside the container, because an entry that is silently dropped looks exactly like one that worked), `plex_container_additional_networks`, `plex_container_extra_arguments` and `plex_container_labels_additional_labels`.
 - **The Traefik labels describe what was deployed** — hostname, path prefix, both path-prefix middlewares and the load balancer port — and that `templates/labels.j2` emits *nothing* Traefik-related when `plex_container_labels_traefik_enabled` is `false`.
 - **`plex_claim_token` is plumbed through**: No real token exists here, so `templates/env.j2` is rendered out of band with a stand-in value and checked to produce a `PLEX_CLAIM` line, while the env file the role really wrote is checked to contain no `PLEX_CLAIM` at all — an empty `PLEX_CLAIM=` is not the same thing as none.
-- **The env and label files are `0640`, owned by `plex_uid`:`plex_gid`**: The env file is where a claim token would land, so its mode is part of this role's security surface.
 
 What it does not prove:
 

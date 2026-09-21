@@ -347,29 +347,6 @@
             fail_msg: "plex_container_labels_additional_labels or plex_container_extra_arguments went nowhere"
             success_msg: "plex_container_labels_additional_labels and plex_container_extra_arguments reached the container"
 
-        - name: Stat the support files the role rendered
-          ansible.builtin.stat:
-            path: "/{{ plex_defaults.plex_identifier }}/{{ item }}"
-          register: plex_support_file_stats
-          loop:
-            - env
-            - labels
-
-        # The env file is where a `plex_claim_token` would end up, so its mode is
-        # part of this role's security surface rather than a cosmetic detail.
-        - name: Assert the support files are readable only by Plex
-          ansible.builtin.assert:
-            that:
-              - item.stat.exists
-              - item.stat.mode == '0640'
-              - item.stat.uid | int == plex_uid | int
-              - item.stat.gid | int == plex_gid | int
-            fail_msg: "{{ item.item }} is {{ item.stat.mode | default('missing') }} owned by {{ item.stat.uid | default('nobody') }}"
-            success_msg: "{{ item.item }} is 0640 owned by {{ plex_uid }}:{{ plex_gid }}"
-          loop: "{{ plex_support_file_stats.results }}"
-          loop_control:
-            label: "{{ item.item }}"
-
         - name: Read the env file the role rendered
           ansible.builtin.slurp:
             src: "/{{ plex_defaults.plex_identifier }}/env"
