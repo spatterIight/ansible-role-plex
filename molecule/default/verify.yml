@@ -85,6 +85,16 @@
           changed_when: false
           loop: "{{ plex_verify_units }}"
 
+        - name: Inspect the Plex container
+          ansible.builtin.command:
+            cmd: docker container inspect plex
+          register: plex_container_raw
+          changed_when: false
+
+        - name: Parse the Plex container definition
+          ansible.builtin.set_fact:
+            plex_container: "{{ (plex_container_raw.stdout | from_json)[0] }}"
+
         # The published port differs from the container port on purpose, so this
         # answering at all means the role's `-p` mapping was rendered from both
         # `plex_container_http_bind_port` and `plex_container_http_port`.
@@ -206,16 +216,6 @@
               The container reports UTC offset {{ plex_container_timezone.stdout | trim }}, not the
               {{ plex_molecule_expected_timezone_offset }} that plex_timezone={{ plex_timezone }} calls for
             success_msg: "The container runs at UTC offset {{ plex_molecule_expected_timezone_offset }}, as plex_timezone asks"
-
-        - name: Inspect the Plex container
-          ansible.builtin.command:
-            cmd: docker container inspect plex
-          register: plex_container_raw
-          changed_when: false
-
-        - name: Keep the parts of the container definition worth asserting on
-          ansible.builtin.set_fact:
-            plex_container: "{{ (plex_container_raw.stdout | from_json) | first }}"
 
         - name: Assert the container runs the image tag defaults/main.yml pins
           ansible.builtin.assert:
