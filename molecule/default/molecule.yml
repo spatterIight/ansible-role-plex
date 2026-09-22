@@ -57,11 +57,23 @@ provisioner:
         plex_molecule_fake_claim_token: claim-molecule-never-sent-anywhere
 
         # Variables for Plex
+        #
+        # Deliberately not 1000: the linuxserver.io PUID/PGID pattern has left a
+        # needed directory unwritable in other roles of this fleet, and a uid
+        # that exists in the test image by accident would hide that.
         plex_uid: 1971
         plex_gid: 1971
-        plex_hostname: plex.example.com
-        plex_path_prefix: /plex
-        plex_timezone: Pacific/Kiritimati
+
+        plex_hostname: plex.molecule.local
+
+        # A non-root path prefix exercises the strip-prefix and slashless
+        # redirect middlewares in templates/labels.j2.
+        plex_path_prefix: /plex-ui
+
+        # Neither the role's default of Etc/UTC nor the test host's zone, so
+        # that the timezone the container ends up in can only have come from
+        # templates/env.j2.
+        plex_timezone: Asia/Tokyo
 
         # Plex Media Server always listens on 32400 inside the container and
         # offers no supported way to move it, so `plex_container_http_port`
