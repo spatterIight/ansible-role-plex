@@ -284,7 +284,7 @@
         - name: Read the marker through the additional volume
           ansible.builtin.command:
             cmd: >-
-              docker exec {{ plex_defaults.plex_identifier }}
+              docker exec plex
               cat {{ plex_molecule_extra_volume_container_path }}/marker
           register: plex_extra_volume_marker
           changed_when: false
