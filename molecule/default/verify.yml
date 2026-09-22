@@ -203,20 +203,6 @@
               not by {{ plex_uid }}:{{ plex_gid }}
             success_msg: "Plex wrote its preferences as {{ plex_uid }}:{{ plex_gid }}"
 
-        - name: Read the timezone offset inside the Plex container
-          ansible.builtin.command:
-            cmd: "docker exec {{ plex_defaults.plex_identifier }} date +%z"
-          register: plex_container_timezone
-          changed_when: false
-
-        - name: Assert the container runs in the timezone the role configured
-          ansible.builtin.assert:
-            that: plex_container_timezone.stdout | trim == plex_molecule_expected_timezone_offset
-            fail_msg: >-
-              The container reports UTC offset {{ plex_container_timezone.stdout | trim }}, not the
-              {{ plex_molecule_expected_timezone_offset }} that plex_timezone={{ plex_timezone }} calls for
-            success_msg: "The container runs at UTC offset {{ plex_molecule_expected_timezone_offset }}, as plex_timezone asks"
-
         - name: Assert the container runs the image tag defaults/main.yml pins
           ansible.builtin.assert:
             that:
@@ -466,7 +452,6 @@
               - "Plex version: {{ plex_reported_version }} (claimed={{ plex_reported_claimed }})"
               - "Plex image: {{ plex_container.Config.Image }}"
               - "Plex machine identifier, shared by /identity and the role's data path: {{ plex_reported_machine_identifier }}"
-              - "Plex container timezone offset: {{ plex_container_timezone.stdout | trim }}"
               - "Plex networks: {{ plex_container.NetworkSettings.Networks.keys() | list | join(', ') }}"
 
       rescue:

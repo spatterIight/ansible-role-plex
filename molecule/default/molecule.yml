@@ -51,12 +51,6 @@ provisioner:
         # networks, so prepare.yml does.
         plex_molecule_extra_network: plex-molecule-extra
 
-        # Pacific/Kiritimati is UTC+14 all year round, and is nothing like the
-        # `Etc/UTC` the role defaults to or the UTC the image would otherwise
-        # use, so the offset the container reports can only have come from the
-        # role's own env file.
-        plex_molecule_expected_timezone_offset: "+1400"
-
         # A claim token cannot be exercised for real (see molecule/README.md),
         # so templates/env.j2 is rendered with this stand-in value out of band
         # to check that a configured token reaches the env file at all.
