@@ -49,7 +49,7 @@ Plex Media Server is proprietary software, and that puts a hard ceiling on what 
 
 Everything which requires the Plex account is therefore out of scope: signing in, adding libraries, scanning media, metadata agents, transcoding (hardware or otherwise), and so on.
 
-What an unclaimed server *does* do turns out to be enough to test the role itself. Run by hand before any of this was written, `lscr.io/linuxserver/plex` starts, serves HTTP on 32400 and answers `/identity` without authentication, with both the running version and the server's `machineIdentifier`.
+What an unclaimed server *does* do turns out to be enough to test the role itself. Run by hand before any of this was written, `ghcr.io/linuxserver/plex` starts, serves HTTP on 32400 and answers `/identity` without authentication, with both the running version and the server's `machineIdentifier`.
 
 Here is a list of what a successful run proves:
 

@@ -55,7 +55,7 @@ scenario() {
 	git config commit.gpgsign false
 
 	cat > defaults/main.yml <<-'YAML'
-		# renovate: datasource=docker depName=lscr.io/linuxserver/plex versioning=semver
+		# renovate: datasource=docker depName=ghcr.io/linuxserver/plex versioning=semver
 		plex_version: 1.43.3
 		plex_arch: amd64
 		plex_version_environment_variable: docker
