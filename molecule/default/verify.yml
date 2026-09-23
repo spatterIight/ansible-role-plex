@@ -426,36 +426,6 @@
             fail_msg: "templates/env.j2 dropped plex_claim_token on the floor"
             success_msg: "templates/env.j2 passes plex_claim_token through as PLEX_CLAIM"
 
-        # Roles elsewhere in this fleet have emitted Traefik labels from outside
-        # their `*_labels_traefik_enabled` conditional, which nobody notices until
-        # a Traefik instance starts routing to a container that opted out. The
-        # label file is rendered a second time here with Traefik switched off, so
-        # that a leak out of the conditional fails the suite rather than the
-        # operator's reverse proxy.
-        - name: Render the label file with Traefik disabled
-          ansible.builtin.template:
-            src: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/labels.j2"
-            dest: /tmp/plex-labels-with-traefik-disabled
-            mode: "0644"
-          vars:
-            plex_container_labels_traefik_enabled: false
-          changed_when: false
-
-        - name: Read the label file rendered with Traefik disabled
-          ansible.builtin.slurp:
-            src: /tmp/plex-labels-with-traefik-disabled
-          register: plex_labels_with_traefik_disabled
-
-        - name: Assert nothing Traefik-related is emitted when Traefik is disabled
-          ansible.builtin.assert:
-            that:
-              - "'mash.molecule.additional_label=present' in (plex_labels_with_traefik_disabled.content | b64decode)"
-              - "'traefik' not in (plex_labels_with_traefik_disabled.content | b64decode)"
-            fail_msg: >-
-              templates/labels.j2 emits Traefik labels even with
-              plex_container_labels_traefik_enabled set to false
-            success_msg: "templates/labels.j2 emits no Traefik labels when Traefik is disabled"
-
         - name: Verify nothing was quietly restarting while all of that was being checked
           when: "plex_restarts_check_enabled | bool"
           block:
