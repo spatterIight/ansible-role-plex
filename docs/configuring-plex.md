@@ -16,17 +16,17 @@ SPDX-FileCopyrightText: 2024-2026 Suguru Hirahara
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# Setting up Plex
+# Setting up Plex Media Server
 
-This is an [Ansible](https://www.ansible.com/) role which installs [Plex](https://plex.org/) to run as a [Docker](https://www.docker.com/) container wrapped in a systemd service.
+This is an [Ansible](https://www.ansible.com/) role which installs a standalone [Plex Media Server](https://docs.linuxserver.io/images/docker-plex) to run as a [Docker](https://www.docker.com/) container wrapped in a systemd service.
 
-Plex is an open-source personal media server that allows you to organize and stream your collection of movies, TV shows, and music.
+Plex is a personal media server that allows you to organize and stream your collection of movies, TV shows, music, and photos.
 
-See the project's [documentation](https://plex.org/docs/) to learn what Plex does and why it might be useful to you.
+See the project's [documentation](https://docs.linuxserver.io/images/docker-plex/) to learn what Plex Media Server does and why it might be useful to you.
 
 ## Adjusting the playbook configuration
 
-To enable Plex with this role, add the following configuration to your `vars.yml` file.
+To enable Plex Media Server with this role, add the following configuration to your `vars.yml` file.
 
 **Note**: the path should be something like `inventory/host_vars/mash.example.com/vars.yml` if you use the [MASH Ansible playbook](https://github.com/mother-of-all-self-hosting/mash-playbook).
 
@@ -39,6 +39,20 @@ To enable Plex with this role, add the following configuration to your `vars.yml
 
 plex_enabled: true
 
+# The path where media files are stored on the host system (defaults to /mash/plex/media)
+plex_media_path: "{{ plex_base_path }}/media"
+
+# The path at which plex_media_path is mounted to inside the container
+# Takes a path value (e.g. "/media"), or empty string to not mount.
+plex_media_bind_path: "/media"
+
+# Since the container is NOT run in 'host' networking mode
+# it is required that a claim token be provided during first time setup
+#
+# Link to obtain -> https://plex.tv/claim
+# Keep in mind that the claim token expires after 4 minutes.
+plex_claim_token: ""
+
 ########################################################################
 #                                                                      #
 # /plex                                                                #
@@ -48,7 +62,7 @@ plex_enabled: true
 
 ### Set the hostname
 
-To enable Plex you need to set the hostname as well. To do so, add the following configuration to your `vars.yml` file. Make sure to replace `example.com` with your own value.
+To enable Plex Media Server you need to set the hostname as well. To do so, add the following configuration to your `vars.yml` file. Make sure to replace `example.com` with your own value.
 
 ```yaml
 plex_hostname: "example.com"
@@ -61,37 +75,45 @@ After adjusting the hostname, make sure to adjust your DNS records to point the 
 To mount additional data directories, add the following configuration to your `vars.yml` file (adapt to your needs):
 
 ```yaml
-plex_container_additional_volumes_custom:
+plex_container_additional_volumes:
   - type: bind
     src: /path/to/blackhole
     dst: /downloads
 ```
 
-### Configuring DLNA & Local discovery
+### Exposing ports
 
-By default your Plex instance cannot be connected to directly, and must be routed through Traefik (usually with HTTPS). This works fine for the web-app, phone, and TV apps. However, depending on your setup, you may want to connect directly to your server on the LAN with no HTTPS.
-
-Keep in mind that doing so will send your Plex password across the network in plain-text. This is not a recommended configuration. That said, here is how:
+By default no ports are exposed, but you'll most likely want to adjust this. The below defines what these ports are and why you may want to expose them.
 
 ```yaml
-# The main Plex webserver port, setting this variable will expose that port and allow you to connect directly to it (without Traefik).
-plex_container_http_host_bind_port: 8096
+# The main Plex webserver port, you'll want to set this variable (and configure port-forwarding in your router) if you want to access Plex from https://app.plex.tv
+# Or if you want to access Plex via TV and phone apps
+plex_container_http_bind_port: 32400
 
-# The Plex DLNA server, used for clients to discover Plex on the LAN
-plex_container_service_discover_bind_port: 1900
+# These are GDM network discovery ports, used by Plex clients on the same network
+# to discover your server and connect to it locally, which is faster than reaching out to https://app.plex.tv
+# and connecting back to your server via its external IP address
+plex_container_gdm_bind_port_01: 32410
+plex_container_gdm_bind_port_02: 32412
+plex_container_gdm_bind_port_03: 32413
+plex_container_gdm_bind_port_04: 32414
 
-# Another service related to discovering Plex on the LAN.
-# From the docs:
-# "Allows clients to discover Plex on the local network. A broadcast message to this port with 'Who is PlexServer?' will get a JSON response that includes the server address, ID, and name."
-plex_container_client_discover_bind_port: 7359
+# Access to the Plex DLNA server
+# You probably don't need this
+plex_container_dlna_udp_bind_port: 1900
+plex_container_dlna_tcp_bind_port: 32469
 
-# The server address the client discovery service should respond with
-plex_published_server_url: "http://{{ ansible_default_ipv4.address }}:{{ plex_container_http_host_bind_port }}"
+# A special port used for controlling Plex for Roku via Plex Companion
+# You probably don't need this, and the Plex for Roku app doesn't require it
+plex_container_roku_bind_port: 8324
+
+# A older Bonjour/Avahi network discovery port
+# You probably don't need this
+plex_container_bonjour_port: 5353
 ```
 
-Upstream documentation: <https://plex.org/docs/general/post-install/networking/>
-
-After setting these variables you should be able to discover and connect to your Plex server entirely on the LAN. If for some reason it is still not discoverable try inputting your `plex_published_server_url` manually.
+- Upstream documentation #1: <https://support.plex.tv/articles/201543147-what-network-ports-do-i-need-to-allow-through-my-firewall/>
+- Upstream documentation #2: <https://docs.linuxserver.io/images/docker-plex/#umask-for-running-applications>
 
 ### Hardware Acceleration
 
@@ -129,6 +151,36 @@ plex_nvidia_visible_devices: "all"
 
 Upstream documentation: <https://docs.linuxserver.io/images/docker-plex/#nvidia>
 
+---
+
+To verify Plex is detecting your GPU navigate to `Settings -> Transcoder -> Hardware transcoding device` and select your GPU. If you do not see the `Hardware transcoding device` drop-down make sure you have ticked the `Use hardware acceleration when available` checkbox. If everything is working right you should see something like this:
+
+![Plex Configure Transcoding](./assets/transcoder.webp)
+
+### Plex Pass updates
+
+To enable Plex Pass updates you will (unfortunately) have to run the container as a root user AND have to disable the container being in read-only mode. You'll also want to set `plex_version_environment_variable` to `latest` or `public`:
+
+```yaml
+# The user/group to run the application as
+# In the below example, '0:0' indicates the root user and root group
+plex_uid: '0'
+plex_gid: '0'
+
+# Controls whether the container filesystem is read-only
+plex_container_read_only: false
+
+# Valid settings for 'plex_version_environment_variable' are:
+#
+# 1: docker: Let Docker handle the Plex Version, we keep our Dockerhub Endpoint up to date with the latest public builds.
+# 2: latest: will update plex to the latest version available that you are entitled to.
+# 3: public: will update plexpass users to the latest public version, useful for plexpass users that don't want to be on the bleeding edge but still want the latest public updates.
+# 4: <specific-version>: will select a specific version (eg 0.9.12.4.1192-9a47d21) of plex to install, note you cannot use this to access plexpass versions if you do not have plexpass.
+#
+# NOTE -> You cannot update to a PlexPass only (beta) version if you are not logged in with a PlexPass account
+plex_version_environment_variable: latest
+```
+
 ### Extending the configuration
 
 There are some additional things you may wish to configure about the service.
@@ -149,13 +201,11 @@ If you use the MASH playbook, the shortcut commands with the [`just` program](ht
 
 ## Usage
 
-After running the command for installation, Plex becomes available at the specified hostname like `https://example.com`.
+After running the command for installation, Plex Media Server becomes available at the specified hostname like `https://example.com`.
 
-To get started, open the URL with a web browser to create an account.
+To get started, open the URL with a web browser, and follow the set up wizard.
 
-![Plex Configure User](./assets/setup-1.webp)
-
-When prompted to add your media libraries keep in mind that it will be the path **inside** the container, most likely the `dst` parameter of your `plex_container_additional_volumes_custom` variable.
+When prompted to add your media libraries keep in mind that it will be the path **inside** the container, most likely the `dst` parameter of your `plex_container_additional_volumes` variable.
 
 ## Troubleshooting
 
