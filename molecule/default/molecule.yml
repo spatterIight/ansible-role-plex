@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 # SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Suguru Hirahara
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -11,6 +13,8 @@ dependency:
 driver:
   name: docker
 platforms:
+  # The name embeds both the role and the scenario, so that parallel runs of
+  # other roles (or of another scenario of this one) cannot collide on it.
   - name: plex-${MOLECULE_DISTRO:-ubuntu2604}-default
     image: "geerlingguy/docker-${MOLECULE_DISTRO:-ubuntu2604}-ansible:latest"
     command: ${MOLECULE_DOCKER_COMMAND:-""}
@@ -19,8 +23,6 @@ platforms:
     cgroupns_mode: host
     privileged: true
     pre_build_image: true
-    published_ports:
-      - 127.0.0.1:32400:32400
 provisioner:
   name: ansible
   config_options:
@@ -31,15 +33,80 @@ provisioner:
       all:
         # Helper variables
         plex_debug_service_enabled: false
+        plex_restarts_check_enabled: true
+
+        # `plex_data_path` is derived through Jinja, so verify.yml (where the
+        # role is not in scope) cannot resolve it. The value the role's
+        # defaults produce is spelled out here and asserted against there.
+        plex_molecule_data_path: /plex/data
+
+        # Where the extra bind-mount that exercises
+        # `plex_container_additional_volumes` comes from, and what it holds.
+        plex_molecule_extra_volume_host_path: /mash-plex-molecule-extra
+        plex_molecule_extra_volume_container_path: /extra
+        plex_molecule_extra_volume_marker: only-a-real-bind-mount-can-read-this
+
+        # The container network that exercises
+        # `plex_container_additional_networks`. The role does not create these
+        # networks, so prepare.yml does.
+        plex_molecule_extra_network: plex-molecule-extra
+
+        # A claim token cannot be exercised for real (see molecule/README.md),
+        # so templates/env.j2 is rendered with this stand-in value out of band
+        # to check that a configured token reaches the env file at all.
+        plex_molecule_fake_claim_token: claim-molecule-never-sent-anywhere
 
         # Variables for Plex
-        plex_uid: 1000
-        plex_gid: 1000
-        plex_hostname: localhost
-        plex_container_labels_traefik_enabled: false
-        plex_container_http_bind_port: 32400
+        #
+        # Deliberately not 1000: the linuxserver.io PUID/PGID pattern has left a
+        # needed directory unwritable in other roles of this fleet, and a uid
+        # that exists in the test image by accident would hide that.
+        plex_uid: 1971
+        plex_gid: 1971
+
+        plex_hostname: plex.molecule.local
+
+        # A non-root path prefix exercises the strip-prefix and slashless
+        # redirect middlewares in templates/labels.j2.
+        plex_path_prefix: /plex-ui
+
+        # Neither the role's default of Etc/UTC nor the test host's zone, so
+        # that the timezone the container ends up in can only have come from
+        # templates/env.j2.
+        plex_timezone: Asia/Tokyo
+
+        # Plex Media Server always listens on 32400 inside the container and
+        # offers no supported way to move it, so `plex_container_http_port`
+        # cannot be moved the way other roles' port variables can. What is
+        # checked instead is the mapping: the published ports deliberately
+        # differ from the container ports, so a role that ignored either
+        # variable would publish nothing on them.
+        plex_container_http_bind_port: "127.0.0.1:32499"
+        plex_container_dlna_tcp_bind_port: "127.0.0.1:32479"
+
+        # Mounting media exercises the `plex_media_bind_path` code path, which
+        # both creates the host directory and adds a second bind mount.
+        plex_media_bind_path: /media
+
+        plex_container_additional_networks_custom:
+          - plex-molecule-extra
+
+        plex_container_additional_volumes:
+          - type: bind
+            src: /mash-plex-molecule-extra
+            dst: /extra
+            options: readonly
+
+        plex_container_extra_arguments:
+          - "--label=mash.molecule.extra_argument=present"
+
+        plex_environment_variables_additional_variables: |
+          PLEX_MOLECULE_MARKER=rendered-by-the-role
+
+        plex_container_labels_additional_labels: |
+          mash.molecule.additional_label=present
   env:
-    # This is a hack to resolve https://github.com/ansible/molecule/issues/4391
+    # Workaround for https://github.com/ansible/molecule/issues/4391
     ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..:/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles:~/.ansible/roles
 verifier:
   name: ansible

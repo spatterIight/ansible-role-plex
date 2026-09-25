@@ -1,5 +1,5 @@
 <!--
-SPDX-FileCopyrightText: 2018-2025 Slavi Pantaleev
+SPDX-FileCopyrightText: 2018-2026 Slavi Pantaleev
 SPDX-FileCopyrightText: 2019-2022 Aaron Raimist
 SPDX-FileCopyrightText: 2019-2023 MDAD project contributors
 SPDX-FileCopyrightText: 2023 QEDeD
@@ -41,13 +41,35 @@ source ./molecule/venv/bin/activate
 pip3 install -r ./molecule/requirements.txt
 ```
 
+## What the suite can and cannot tell you
+
+Plex Media Server is proprietary software, and that puts a hard ceiling on what an automated suite is allowed to claim.
+
+**A Plex server has to be claimed to a Plex account to be of any use**, and claiming needs a `PLEX_CLAIM` token from Plex. Those tokens are bound to a person's Plex account. GitHub CI runners cannot hold one, and this role's scenario does not pretend otherwise: every run leaves an **unclaimed** server, and `verify.yml` asserts that it is unclaimed (`claimed="0"` on `/identity`). Everything which requires the Plex account is therefore out of scope.
+
+What an unclaimed server *does* do turns out to be enough to test the role itself. Run by hand before any of this was written, `ghcr.io/linuxserver/plex` starts, serves HTTP on 32400 and answers `/identity` without authentication, with both the running version and the server's `machineIdentifier`.
+
+Here is a synopsis of what a successful run proves. Check the scenario itself for details about what are exactly checked.
+
+- The pinned version is the running one
+- The server being probed is the one the role deployed
+- The role's configuration reaches the process
+- The container is built the way the role's variables say
+- The Traefik labels describe what was deployed
+- `plex_claim_token` is plumbed through
+
+What it does not prove:
+
+- If upgrade works
+- Anything about GPU transcoding
+
 ## Scenarios
 
 Currently there is one testing scenario available.
 
 ### `default`
 
-Tests a standard Plex installation.
+A standard Plex installation, with Traefik labels, a media bind mount, an additional volume, an additional container network, extra container arguments and additional labels all switched on, so that each of those code paths is exercised rather than merely defaulted away.
 
 ## Running
 

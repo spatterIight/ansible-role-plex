@@ -23,7 +23,7 @@ plex_media_path: "{{ plex_base_path }}/media"
 # Takes a path value (e.g. "/media"), or empty string to not mount.
 plex_media_bind_path: ""
 
-# renovate: datasource=docker depName=lscr.io/linuxserver/plex versioning=semver
+# renovate: datasource=docker depName=ghcr.io/linuxserver/plex versioning=semver
 plex_version: 1.43.4
 plex_arch: amd64
 
@@ -87,7 +87,7 @@ plex_container_image: "{{ plex_container_image_registry_prefix }}linuxserver/ple
 plex_container_image_tag: "{{ plex_version }}"
 plex_container_image_registry_prefix: "{{ plex_container_image_registry_prefix_upstream }}"
 plex_container_image_registry_prefix_upstream: "{{ plex_container_image_registry_prefix_upstream_default }}"
-plex_container_image_registry_prefix_upstream_default: lscr.io/
+plex_container_image_registry_prefix_upstream_default: ghcr.io/
 
 # A list of additional container networks that the container would be connected to.
 # The role does not create these networks, so make sure they already exist.

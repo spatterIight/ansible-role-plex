@@ -1,52 +1,492 @@
+# SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 # SPDX-FileCopyrightText: 2026 spatterlight
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 ---
-- name: Verify Plex systemd service
+# What this scenario has to survive, established by running
+# `ghcr.io/linuxserver/plex` by hand before any of it was written:
+#
+# - Plex answers 200 on every path a request can be pointed at,
+#   `/zzz-does-not-exist` included (it replies with an empty `MediaContainer`),
+#   so "GET / returned 200" proves only that some HTTP server is listening.
+#   The scenario this replaced accepted `200 or 401` on `/`, which any web
+#   server in the world satisfies.
+# - The systemd unit carries `Restart=always`, so `systemctl is-active` says
+#   `active` for a container that is crash-looping. The unit's restart counter
+#   is checked alongside its state for that reason.
+# - `/identity` is answered without authentication and carries both the running
+#   `version` and the server's `machineIdentifier`. It is the only version
+#   surface available here, because every other API endpoint needs a token that
+#   only a claimed server hands out.
+# - Plex writes that same identifier into
+#   `Library/Application Support/Plex Media Server/Preferences.xml` inside
+#   `/config`. Reading it back from the host through the role's own data path
+#   and matching it against what `/identity` reports is what ties the HTTP
+#   server being probed to the bind mount the role set up: a Plex that ignored
+#   the role's data path would report a different identifier.
+#
+# What this scenario deliberately does NOT cover is documented in
+# molecule/README.md: without a `PLEX_CLAIM` token (short-lived and bound to a
+# Plex account, so CI cannot hold one) the server stays unclaimed, and
+# libraries, transcoding and anything else behind a Plex account are out of
+# reach.
+- name: Verify Plex
   hosts: all
   become: true
   gather_facts: false
+
+  vars:
+    plex_molecule_http_port: "{{ plex_container_http_bind_port.split(':') | last }}"
+    plex_molecule_preferences_path: >-
+      {{ plex_molecule_data_path }}/Library/Application Support/Plex Media Server/Preferences.xml
+
+    plex_verify_units:
+      - plex.service
+
+    # The unusual values the scenario configures the role with. Written down
+    # here rather than read back out of the inventory, so that a verify run
+    # compares the running container against something stated, not against
+    # whatever the scenario happens to say at the time.
+    plex_expected_uid: 1971
+    plex_expected_gid: 1971
+    plex_expected_hostname: plex.molecule.local
+    plex_expected_path_prefix: /plex-ui
+    plex_expected_timezone: Asia/Tokyo
+    plex_expected_timezone_abbreviation: JST
+
   tasks:
-    - name: Wait for Plex service to become active (up to 180s)
-      ansible.builtin.systemd:
-        name: plex.service
-      register: plex_service
-      until: plex_service.status.ActiveState == 'active'
-      retries: 36
-      delay: 5
+    - name: Verify that Plex works
+      block:
+        # The role is not included in this playbook, so its defaults are not in
+        # scope. Reading defaults/main.yml directly ties the version assertion
+        # below.
+        - name: Load the role defaults
+          ansible.builtin.include_vars:
+            file: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/defaults/main.yml"
+            name: plex_defaults
 
-    - name: Assert Plex service is active
-      ansible.builtin.assert:
-        that: plex_service.status.ActiveState == 'active'
-        fail_msg: "plex.service not active ({{ plex_service.status.ActiveState }})"
-        success_msg: "plex.service is active"
+        - name: Wait for the Plex systemd services to become active (up to 180s each)
+          ansible.builtin.systemd_service:
+            name: "{{ item }}"
+          register: plex_services
+          until: plex_services.status.ActiveState == 'active'
+          retries: 36
+          delay: 5
+          loop: "{{ plex_verify_units }}"
+          # So that giving up is reported by the assertion below rather than as a
+          # wall of systemd unit properties.
+          failed_when: false
 
-    - name: Retrieve Plex service log for debugging
-      when: plex_debug_service_enabled | bool
-      ansible.builtin.command:
-        cmd: journalctl -xeu plex.service
-      changed_when: false
+        # `Restart=always` in the systemd unit means that even a container which crashes
+        # and gets restarted reads as active here, so this is a precondition rather than
+        # a result.
+        - name: Assert the Plex systemd services are active
+          ansible.builtin.assert:
+            that: plex_services.results | map(attribute='status.ActiveState') | unique | list == ['active']
+            fail_msg: >-
+              Not every service is active:
+              {{ dict(plex_verify_units | zip(plex_services.results | map(attribute='status.ActiveState'))) }}
+            success_msg: "Every systemd service is active"
 
-    - name: Wait for Plex HTTP endpoint to respond (up to 10m)
-      ansible.builtin.uri:
-        url: "http://localhost:32400/"
-        method: GET
-        status_code: [200, 401]
-        follow_redirects: none
-      register: plex_endpoint_http
-      until: plex_endpoint_http.status in [200, 401]
-      retries: 120
-      delay: 5
+        - name: Retrieve the Plex systemd services log for debugging
+          when: plex_debug_service_enabled | bool
+          ansible.builtin.command:
+            cmd: "journalctl --no-pager --output=cat --unit={{ item }}"
+          changed_when: false
+          loop: "{{ plex_verify_units }}"
 
-    - name: Assert Plex HTTP endpoint responds
-      ansible.builtin.assert:
-        that: plex_endpoint_http.status in [200, 401]
-        fail_msg: "Plex did not respond with 200 or 401 ({{ plex_endpoint_http.status | default('no response') }})"
-        success_msg: "Plex responded with {{ plex_endpoint_http.status }}"
+        - name: Inspect the Plex container
+          ansible.builtin.command:
+            cmd: docker container inspect plex
+          register: plex_container_raw
+          changed_when: false
 
-    - name: Show Plex systemd service status summary
-      ansible.builtin.debug:
-        msg:
-          - "Plex systemd: {{ plex_service.status.ActiveState }}"
-          - "Plex HTTP: {{ plex_endpoint_http.status }}"
+        - name: Parse the Plex container definition
+          ansible.builtin.set_fact:
+            plex_container: "{{ (plex_container_raw.stdout | from_json)[0] }}"
+
+        # ------------------------------------------------------------------
+        # What `docker create` was actually told
+        # ------------------------------------------------------------------
+
+        - name: Assert that the role's uid and gid reached the container
+          ansible.builtin.assert:
+            that:
+              - plex_container.Config.User == (plex_expected_uid | string) ~ ':' ~ (plex_expected_gid | string)
+              - ('PUID=' ~ plex_expected_uid) in plex_container.Config.Env
+              - ('PGID=' ~ plex_expected_gid) in plex_container.Config.Env
+            fail_msg: >-
+              The container runs as {{ plex_container.Config.User }}
+              with {{ plex_container.Config.Env | select('match', 'P[UG]ID=') | list }}
+            success_msg: "The container runs as {{ plex_container.Config.User }} and carries the matching PUID/PGID"
+
+        - name: Assert that the role's timezone reached the container environment
+          ansible.builtin.assert:
+            that:
+              - ('TZ=' ~ plex_expected_timezone) in plex_container.Config.Env
+            fail_msg: "templates/env.j2 did not put TZ={{ plex_expected_timezone }} on the container"
+            success_msg: "The container environment carries TZ={{ plex_expected_timezone }}"
+
+        - name: Assert that the container image is the pinned version
+          ansible.builtin.assert:
+            that:
+              - plex_container.Config.Image == 'ghcr.io/linuxserver/plex:' ~ plex_defaults.plex_version
+            fail_msg: >-
+              The container runs {{ plex_container.Config.Image }}, not the
+              {{ plex_defaults.plex_version }} pinned in defaults/main.yml
+            success_msg: "The container runs {{ plex_container.Config.Image }}"
+
+        # linuxserver.io stamps its own build onto the image as
+        # `<Plex version>-ls<rebuild counter>`.
+        #
+        # `plex_version` pins a three-component linuxserver.io tag (`6.3.0`) while
+        # Plex's own version has four components (`6.3.0.10514`) and the image
+        # label carries the rebuild counter on top (`6.3.0.10514-ls314`), so the pin
+        # is compared as a prefix - with the trailing dot,
+        - name: Assert the running Plex is the version this role installs
+          ansible.builtin.assert:
+            that: plex_container.Config.Labels['org.opencontainers.image.version'].startswith(plex_defaults.plex_version)
+            fail_msg: "Plex reports {{ plex_container.Config.Labels['org.opencontainers.image.version'] | default('none') }}, expected {{ plex_defaults.plex_version }}"
+            success_msg: "Plex reports {{ plex_container.Config.Labels['org.opencontainers.image.version'] }}"
+
+        # ------------------------------------------------------------------
+        #
+        # ------------------------------------------------------------------
+
+        # The published port differs from the container port on purpose, so this
+        # answering at all means the role's `-p` mapping was rendered from both
+        # `plex_container_http_bind_port` and `plex_container_http_port`.
+        - name: Wait for Plex to answer on the port the role published
+          ansible.builtin.uri:
+            url: "http://127.0.0.1:{{ plex_molecule_http_port }}/identity"
+            method: GET
+            follow_redirects: none
+            return_content: true
+            status_code: [200]
+          register: plex_identity
+          until: plex_identity.status == 200
+          retries: 60
+          delay: 5
+          failed_when: false
+
+        - name: Assert Plex answered on the port the role published
+          ansible.builtin.assert:
+            that: plex_identity.status == 200
+            fail_msg: >-
+              Nothing answered /identity on 127.0.0.1:{{ plex_molecule_http_port }}
+              ({{ plex_identity.status | default('no response') }})
+            success_msg: "Plex answered /identity on 127.0.0.1:{{ plex_molecule_http_port }}"
+
+        # The `<?xml version="1.0" ...?>` declaration that opens the response also
+        # carries a `version` attribute, and it comes first. Dropping the
+        # declaration before reading anything is what keeps this from reporting
+        # Plex's version as `1.0` - which it did, on the first run of this file.
+        - name: Extract what Plex reports about itself
+          ansible.builtin.set_fact:
+            plex_identity_container: "{{ plex_identity.content | regex_replace('<\\?xml[^>]*\\?>', '') }}"
+
+        - name: Keep what Plex reports about itself
+          ansible.builtin.set_fact:
+            plex_reported_machine_identifier: "{{ plex_identity_container | regex_search('machineIdentifier=\"([^\"]+)\"', '\\1') | first }}"
+            plex_reported_claimed: "{{ plex_identity_container | regex_search('claimed=\"([^\"]+)\"', '\\1') | first }}"
+
+        - name: Assert the server is unclaimed, as an unattended CI run can only leave it
+          ansible.builtin.assert:
+            that: plex_reported_claimed == '0'
+            fail_msg: >-
+              Plex reports claimed={{ plex_reported_claimed }}, but this scenario has no
+              claim token to have claimed it with
+            success_msg: "Plex reports an unclaimed server, which is the ceiling of what CI can test"
+
+        - name: Read the preferences file Plex wrote into the role's data path
+          ansible.builtin.slurp:
+            src: "{{ plex_molecule_preferences_path | trim }}"
+          register: plex_preferences
+
+        - name: Stat the preferences file Plex wrote into the role's data path
+          ansible.builtin.stat:
+            path: "{{ plex_molecule_preferences_path | trim }}"
+          register: plex_preferences_stat
+
+        # This is what makes the HTTP checks above mean something: it is the same
+        # server, and the directory it keeps its library database in is the one the
+        # role bind-mounted.
+        #
+        # The identifier is matched as a whole attribute rather than pulled out
+        # with a capture group, because a `regex_search` group reference inside an
+        # `assert` condition is rejected as an "Unknown argument".
+        - name: Assert the server answering over HTTP is the one using the role's data path
+          ansible.builtin.assert:
+            that:
+              - >-
+                'ProcessedMachineIdentifier="' ~ plex_reported_machine_identifier ~ '"'
+                in (plex_preferences.content | b64decode)
+              - plex_reported_machine_identifier | length > 0
+            fail_msg: >-
+              {{ plex_molecule_preferences_path | trim }} does not belong to the Plex that
+              answered on port {{ plex_molecule_http_port }}
+            success_msg: >-
+              The Plex answering on port {{ plex_molecule_http_port }} keeps its state in
+              {{ plex_molecule_data_path }}, where the role bind-mounted it
+
+        # linuxserver.io images normally run s6 as root and drop to PUID/PGID, but
+        # this role runs the container as `--user` directly. Four roles in this
+        # fleet have shipped a uid override that left a directory the image needed
+        # unwritable, so the scenario runs as a uid that is neither root nor the
+        # 1000 the image defaults to, and checks who ends up owning the files.
+        - name: Assert Plex wrote its preferences as the uid and gid the role was given
+          ansible.builtin.assert:
+            that:
+              - plex_preferences_stat.stat.exists
+              - plex_preferences_stat.stat.uid | int == plex_uid | int
+              - plex_preferences_stat.stat.gid | int == plex_gid | int
+            fail_msg: >-
+              The preferences file is owned by
+              {{ plex_preferences_stat.stat.uid | default('none') }}:{{ plex_preferences_stat.stat.gid | default('none') }},
+              not by {{ plex_uid }}:{{ plex_gid }}
+            success_msg: "Plex wrote its preferences as {{ plex_uid }}:{{ plex_gid }}"
+
+        - name: Assert the role's environment reached the container
+          ansible.builtin.assert:
+            that:
+              - "'VERSION=' ~ plex_defaults.plex_version_environment_variable in plex_container.Config.Env"
+              - "'PLEX_MOLECULE_MARKER=rendered-by-the-role' in plex_container.Config.Env"
+              # No claim token was configured, so none may be passed. An empty
+              # `PLEX_CLAIM=` is not the same thing as no `PLEX_CLAIM` at all.
+              - plex_container.Config.Env | select('match', 'PLEX_CLAIM') | list | length == 0
+            fail_msg: "The container environment is not what templates/env.j2 should have produced: {{ plex_container.Config.Env }}"
+            success_msg: "The container environment is the one templates/env.j2 produced"
+
+        - name: Assert the ports the role published are the ports the role was given
+          ansible.builtin.assert:
+            that:
+              - >-
+                plex_container.NetworkSettings.Ports[plex_defaults.plex_container_http_port | string ~ '/tcp']
+                | map(attribute='HostPort') | list == [plex_molecule_http_port]
+              - >-
+                plex_container.NetworkSettings.Ports[plex_defaults.plex_container_http_port | string ~ '/tcp']
+                | map(attribute='HostIp') | list == ['127.0.0.1']
+              - >-
+                plex_container.NetworkSettings.Ports[plex_defaults.plex_container_dlna_tcp_port | string ~ '/tcp']
+                | map(attribute='HostPort') | list == [plex_container_dlna_tcp_bind_port.split(':') | last]
+              # Nothing asked for the DLNA UDP, Bonjour, Roku or GDM ports to be
+              # published, so they must stay as the image exposes them: present in
+              # the port map, with no host binding at all.
+              - plex_container.NetworkSettings.Ports['1900/udp'] is none
+              - plex_container.NetworkSettings.Ports['5353/udp'] is none
+              - plex_container.NetworkSettings.Ports['8324/tcp'] is none
+              - plex_container.NetworkSettings.Ports['32410/udp'] is none
+            fail_msg: "The published ports are not what the role was configured for: {{ plex_container.NetworkSettings.Ports }}"
+            success_msg: >-
+              Container port {{ plex_defaults.plex_container_http_port }} is published on
+              {{ plex_container_http_bind_port }}, and no port the role was not asked to publish is
+
+        - name: Assert the container filesystem is read-only, with a writable /run
+          ansible.builtin.assert:
+            that:
+              - plex_container.HostConfig.ReadonlyRootfs
+              - "'/run' in plex_container.HostConfig.Tmpfs"
+            fail_msg: >-
+              plex_container_read_only did not produce a read-only root filesystem with a tmpfs /run
+              (ReadonlyRootfs={{ plex_container.HostConfig.ReadonlyRootfs }}, Tmpfs={{ plex_container.HostConfig.Tmpfs }})
+            success_msg: "The container runs read-only with a tmpfs /run, as plex_container_read_only asks"
+
+        # Four roles in this fleet accepted `*_container_additional_volumes` and
+        # then dropped it on the floor, so this checks both that the entry became a
+        # real `--mount` with its `readonly` option honoured, and that the mount
+        # actually carries data through.
+        - name: Assert the data, media and additional volumes became real mounts
+          ansible.builtin.assert:
+            that:
+              - plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | list | length == 1
+              - (plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | first).Source == plex_molecule_data_path
+              - plex_container.Mounts | selectattr('Destination', 'equalto', plex_media_bind_path) | list | length == 1
+              - plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_container_path) | list | length == 1
+              - >-
+                (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_container_path) | first).Source
+                == plex_molecule_extra_volume_host_path
+              - not (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_container_path) | first).RW
+            fail_msg: "The role's volumes did not turn into the expected mounts: {{ plex_container.Mounts }}"
+            success_msg: "The data path, the media path and plex_container_additional_volumes all became real mounts"
+
+        - name: Read the marker through the additional volume
+          ansible.builtin.command:
+            cmd: >-
+              docker exec plex
+              cat {{ plex_molecule_extra_volume_container_path }}/marker
+          register: plex_extra_volume_marker
+          changed_when: false
+
+        - name: Assert the additional volume carries data into the container
+          ansible.builtin.assert:
+            that: plex_extra_volume_marker.stdout | trim == plex_molecule_extra_volume_marker
+            fail_msg: "The additional volume did not carry the marker into the container"
+            success_msg: "The additional volume carries the marker into the container"
+
+        - name: Assert the container joined both its own network and the additional one
+          ansible.builtin.assert:
+            that:
+              - plex_defaults.plex_identifier in plex_container.NetworkSettings.Networks
+              - plex_molecule_extra_network in plex_container.NetworkSettings.Networks
+            fail_msg: >-
+              The container is on {{ plex_container.NetworkSettings.Networks.keys() | list }},
+              which is not the base network plus {{ plex_molecule_extra_network }}
+            success_msg: "The container is on its own network and on {{ plex_molecule_extra_network }}"
+
+        # ------------------------------------------------------------------
+        # Traefik labels
+        # ------------------------------------------------------------------
+
+        - name: Assert that the Traefik labels describe the configured hostname and path prefix
+          ansible.builtin.assert:
+            that:
+              - plex_container.Config.Labels['traefik.enable'] == 'true'
+              - plex_container.Config.Labels['traefik.http.routers.plex.rule'] == 'Host(`' ~ plex_expected_hostname ~ '`) && PathPrefix(`' ~ plex_expected_path_prefix ~ '`)'
+              - plex_container.Config.Labels['traefik.http.middlewares.plex-strip-prefix.stripprefix.prefixes'] == plex_expected_path_prefix
+              - plex_container.Config.Labels['traefik.http.services.plex.loadbalancer.server.port'] == '32400'
+            fail_msg: "The Traefik labels are not what templates/labels.j2 should have produced: {{ plex_container.Config.Labels }}"
+            success_msg: "The Traefik labels route {{ plex_expected_hostname }}{{ plex_expected_path_prefix }} to port 32400"
+
+        - name: Assert the free-form label and extra argument reached the container
+          ansible.builtin.assert:
+            that:
+              - plex_container.Config.Labels['mash.molecule.additional_label'] == 'present'
+              - plex_container.Config.Labels['mash.molecule.extra_argument'] == 'present'
+            fail_msg: "plex_container_labels_additional_labels or plex_container_extra_arguments went nowhere"
+            success_msg: "plex_container_labels_additional_labels and plex_container_extra_arguments reached the container"
+
+        # ------------------------------------------------------------------
+        # What the process inside the container actually sees
+        # ------------------------------------------------------------------
+
+        - name: Ask the Plex container which timezone and user it is running in
+          ansible.builtin.command:
+            cmd: docker exec plex sh -c 'date +%Z; id -u; id -g'
+          register: plex_process_identity
+          changed_when: false
+
+        - name: Assert that the Plex process runs in the role's timezone, as the role's user
+          ansible.builtin.assert:
+            that:
+              - plex_process_identity.stdout_lines[0] == plex_expected_timezone_abbreviation
+              - plex_process_identity.stdout_lines[1] == plex_expected_uid | string
+              - plex_process_identity.stdout_lines[2] == plex_expected_gid | string
+            fail_msg: >-
+              The container reports zone/uid/gid {{ plex_process_identity.stdout_lines }},
+              expected [{{ plex_expected_timezone_abbreviation }},
+              {{ plex_expected_uid }}, {{ plex_expected_gid }}]
+            success_msg: >-
+              The Plex process runs in {{ plex_process_identity.stdout_lines[0] }}
+              as {{ plex_process_identity.stdout_lines[1] }}:{{ plex_process_identity.stdout_lines[2] }}
+
+        # ------------------------------------------------------------------
+        # Verify environment variables reach Plex
+        # ------------------------------------------------------------------
+
+        - name: Read the env file the role rendered
+          ansible.builtin.slurp:
+            src: "/{{ plex_defaults.plex_identifier }}/env"
+          register: plex_env_file
+
+        - name: Assert no claim token is written when none is configured
+          ansible.builtin.assert:
+            that:
+              # Proves the file was read at all, rather than being empty and
+              # satisfying the check below for the wrong reason.
+              - "'PUID=' ~ plex_uid in (plex_env_file.content | b64decode)"
+              - "'PLEX_CLAIM' not in (plex_env_file.content | b64decode)"
+            fail_msg: "templates/env.j2 emitted a PLEX_CLAIM line without a plex_claim_token: {{ plex_env_file.content | b64decode }}"
+            success_msg: "templates/env.j2 emits no PLEX_CLAIM line when no plex_claim_token is set"
+
+        # A real claim token cannot be exercised (see molecule/README.md), but the
+        # plumbing that would carry one can be: the same template is rendered out
+        # of band with a stand-in token, which is never handed to Plex.
+        - name: Render the env file with a claim token configured
+          ansible.builtin.template:
+            src: "{{ lookup('ansible.builtin.env', 'MOLECULE_PROJECT_DIRECTORY') }}/templates/env.j2"
+            dest: /tmp/plex-env-with-claim-token
+            mode: "0600"
+          vars:
+            plex_claim_token: "{{ plex_molecule_fake_claim_token }}"
+            plex_version_environment_variable: "{{ plex_defaults.plex_version_environment_variable }}"
+            plex_nvidia_visible_devices: "{{ plex_defaults.plex_nvidia_visible_devices }}"
+          changed_when: false
+
+        - name: Read the env file rendered with a claim token configured
+          ansible.builtin.slurp:
+            src: /tmp/plex-env-with-claim-token
+          register: plex_env_file_with_claim_token
+
+        - name: Assert a configured claim token reaches the env file
+          ansible.builtin.assert:
+            that: >-
+              'PLEX_CLAIM=' ~ plex_molecule_fake_claim_token
+              in (plex_env_file_with_claim_token.content | b64decode)
+            fail_msg: "templates/env.j2 dropped plex_claim_token on the floor"
+            success_msg: "templates/env.j2 passes plex_claim_token through as PLEX_CLAIM"
+
+        - name: Verify nothing was quietly restarting while all of that was being checked
+          when: "plex_restarts_check_enabled | bool"
+          block:
+            # `Restart=always` means the unit reads `active` while it is crash-looping,
+            # so `active` on its own says very little. The window has to be watched with
+            # everything already answering.
+            - name: Sample the restart counters
+              ansible.builtin.systemd_service:
+                name: "{{ item }}"
+              register: plex_restarts_before
+              loop: "{{ plex_verify_units }}"
+
+            # Comfortably longer than the unit's `RestartSec=30`, so a crash loop has to
+            # tick at least once inside the window.
+            - name: Watch the services for 45 seconds
+              ansible.builtin.pause:
+                seconds: 45
+
+            - name: Sample the restart counters again
+              ansible.builtin.systemd_service:
+                name: "{{ item }}"
+              register: plex_restarts_after
+              loop: "{{ plex_verify_units }}"
+
+            - name: Assert no service restarted while it was up
+              ansible.builtin.assert:
+                that:
+                  - plex_restarts_after.results | map(attribute='status.NRestarts') | list == plex_restarts_before.results | map(attribute='status.NRestarts') | list
+                  - plex_restarts_after.results | map(attribute='status.ActiveState') | unique | list == ['active']
+                fail_msg: >-
+                  A service restarted while it was supposedly up, so `active` was hiding a crash loop.
+                  Before:
+                  {% for unit, restarts in plex_verify_units | zip(plex_restarts_before.results | map(attribute='status.NRestarts')) %}{{ restarts }} ({{ unit }}){% if not loop.last %}, {% endif %}{% endfor %},
+                  after:
+                  {% for unit, restarts in plex_verify_units | zip(plex_restarts_after.results | map(attribute='status.NRestarts')) %}{{ restarts }} ({{ unit }}){% if not loop.last %}, {% endif %}{% endfor %}
+                success_msg: >-
+                  None of the services restarted over 45 seconds of watching (restarts so far:
+                  {% for unit, restarts in plex_verify_units | zip(plex_restarts_after.results | map(attribute='status.NRestarts')) %}{{ restarts }} ({{ unit }}){% if not loop.last %}, {% endif %}{% endfor %})
+
+        - name: Show the Plex verification summary
+          ansible.builtin.debug:
+            msg:
+              - "Plex systemd: {% for unit, state in plex_verify_units | zip(plex_services.results | map(attribute='status.ActiveState')) %}{{ unit }} ({{ state }}){% if not loop.last %}, {% endif %}{% endfor %}"
+              - "Plex restarts: {% for unit, restarts in plex_verify_units | zip(plex_restarts_after.results | map(attribute='status.NRestarts')) %}{{ restarts }} ({{ unit }}){% if not loop.last %}, {% endif %}{% endfor %}"
+              - "Plex version: {{ plex_container.Config.Labels['org.opencontainers.image.version'] }}"
+              - "Plex image: {{ plex_container.Config.Image }}"
+              - "Plex machine identifier, shared by /identity and the role's data path: {{ plex_reported_machine_identifier }}"
+              - "Plex networks: {{ plex_container.NetworkSettings.Networks.keys() | list | join(', ') }}"
+
+      rescue:
+        # Whatever went wrong, the reason is almost always in the systemd service log.
+        - name: Retrieve the Plex systemd service log
+          ansible.builtin.command:
+            cmd: journalctl --no-pager --output=cat --unit=plex.service
+          register: plex_service_log
+          changed_when: false
+
+        - name: Show the Plex systemd service log
+          ansible.builtin.debug:
+            var: plex_service_log.stdout_lines
+
+        - name: Fail because verification did not pass
+          ansible.builtin.fail:
+            msg: "Plex verification failed. The systemd service log is printed above."

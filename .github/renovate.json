@@ -1,51 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "No automerge for Plex's own version, not even at the patch level: Plex Media Server is proprietary, has no auditable migration history, and upgrades the operator's library database in place and forward-only on the first start of a new build, which a fresh-install Molecule run structurally cannot see. What Molecule does gate is that the pinned version runs: the scenario asserts that the version Plex reports over /identity is the `plex_version` that defaults/main.yml pins.",
+    "`versioning=semver` is what keeps the lookup honest among the 2048 tags in linuxserver/plex: it rejects the four-component `X.Y.Z.BBBB-<hash>-lsNNN` builds and the `version-*`, `bionic-*` and arch-prefixed families, leaving the 63 curated three-component tags. `versioning=loose` would pick `1.43.3.10896-cb3ebc72d-ls321` instead, so this must not be relaxed."
+  ],
   "extends": [
-    "config:best-practices",
-    ":automergeAll",
-    ":automergeBranch",
-    ":semanticCommitsDisabled"
-  ],
-  "ignorePresets": [
-    "docker:pinDigests",
-    ":maintainLockFilesWeekly"
-  ],
-  "labels": [
-    "dependencies"
-  ],
-  "ansible-galaxy": {
-    "ignoreUnstable": false,
-    "versioning": "loose"
-  },
-  "pre-commit": {
-    "enabled": true
-  },
-  "regex": {
-    "automerge": false
-  },
-  "packageRules": [
-    {
-      "matchManagers": ["github-actions"],
-      "commitBody": "[skip ci]",
-      "schedule": ["* * 1-7 */6 *"],
-      "automergeSchedule": ["* * 1-14 */6 *"],
-      "groupName": "GitHub Actions dependencies"
-    },
-    {
-      "matchManagers": ["mise", "pip_requirements", "pre-commit", "pyenv"],
-      "schedule": ["* * 1-7 */6 *"],
-      "automergeSchedule": ["* * 1-14 */6 *"]
-    }
-  ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/defaults/main.yml$/"
-      ],
-      "matchStrings": [
-        "# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: (?:lookupName|packageName)=(?<packageName>[^\\s]+?))?(?: versioning=(?<versioning>[a-z-0-9]+?))?\\s+[A-Za-z0-9_]+?(?:_version|_tag)\\s*:\\s*[\"']?(?<currentValue>.+?)[\"']?\\s"
-      ]
-    }
+    "github>mother-of-all-self-hosting/renovate-config#v1.0.0"
   ]
 }

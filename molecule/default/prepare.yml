@@ -1,3 +1,4 @@
+# SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 # SPDX-FileCopyrightText: 2026 spatterlight
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
@@ -18,6 +19,9 @@
       ansible.builtin.package:
         name:
           - python3-requests
+          # The nested Docker daemon below stores its images through
+          # fuse-overlayfs, which needs the binary to be present.
+          - fuse-overlayfs
         state: present
 
     - name: Ensure Docker is installed for Plex Molecule tests preparation
@@ -25,4 +29,32 @@
         name: ansible-role-docker
       vars:
         docker_daemon_options:
-          storage-driver: vfs
+          storage-driver: fuse-overlayfs
+
+    # The role connects the container to the networks listed in
+    # `plex_container_additional_networks` but deliberately does not create
+    # them, so an inert implementation of that variable would go unnoticed
+    # unless the network exists and can be checked for afterwards.
+    - name: Ensure the extra container network for Plex Molecule tests exists
+      ansible.builtin.command:
+        cmd: "docker network create {{ plex_molecule_extra_network }}"
+      register: plex_molecule_extra_network_result
+      changed_when: plex_molecule_extra_network_result.rc == 0
+      failed_when: >-
+        plex_molecule_extra_network_result.rc != 0
+        and 'already exists' not in plex_molecule_extra_network_result.stderr
+
+    # Read back from inside the container later on, which is the only way to
+    # tell a `plex_container_additional_volumes` entry that became a real
+    # `--mount` from one that was silently dropped.
+    - name: Ensure the extra bind-mount source for Plex Molecule tests exists
+      ansible.builtin.file:
+        path: "{{ plex_molecule_extra_volume_host_path }}"
+        state: directory
+        mode: "0755"
+
+    - name: Ensure the extra bind-mount source for Plex Molecule tests holds a marker
+      ansible.builtin.copy:
+        content: "{{ plex_molecule_extra_volume_marker }}\n"
+        dest: "{{ plex_molecule_extra_volume_host_path }}/marker"
+        mode: "0644"
