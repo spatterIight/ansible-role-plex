@@ -5,6 +5,6 @@
     "`versioning=semver` is what keeps the lookup honest among the 2048 tags in linuxserver/plex: it rejects the four-component `X.Y.Z.BBBB-<hash>-lsNNN` builds and the `version-*`, `bionic-*` and arch-prefixed families, leaving the 63 curated three-component tags. `versioning=loose` would pick `1.43.3.10896-cb3ebc72d-ls321` instead, so this must not be relaxed."
   ],
   "extends": [
-    "github>mother-of-all-self-hosting/renovate-config#v1.0.0"
+    "github>mother-of-all-self-hosting/renovate-config#v1.1.0"
   ]
 }
