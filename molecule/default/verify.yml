@@ -302,25 +302,29 @@
               - plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | list | length == 1
               - (plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | first).Source == plex_molecule_data_path
               - plex_container.Mounts | selectattr('Destination', 'equalto', plex_media_bind_path) | list | length == 1
-              - plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_container_path) | list | length == 1
+              - plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | list | length == 1
               - >-
-                (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_container_path) | first).Source
-                == plex_molecule_extra_volume_host_path
-              - not (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_container_path) | first).RW
+                (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | first).Source
+                == plex_molecule_extra_volume_src
+              - not (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | first).RW
             fail_msg: "The role's volumes did not turn into the expected mounts: {{ plex_container.Mounts }}"
             success_msg: "The data path, the media path and plex_container_additional_volumes all became real mounts"
 
+        # Reading the file back from inside the
+        # container is the difference between the variable existing and it working.
         - name: Read the marker through the additional volume
           ansible.builtin.command:
             cmd: >-
               docker exec plex
-              cat {{ plex_molecule_extra_volume_container_path }}/marker
-          register: plex_extra_volume_marker
+              cat {{ plex_molecule_extra_volume_dst }}/{{ plex_molecule_marker_filename }}
+          register: plex_extra_volume
           changed_when: false
 
-        - name: Assert the additional volume carries data into the container
+        - name: Assert the additional volume is mounted into the Plex container
           ansible.builtin.assert:
-            that: plex_extra_volume_marker.stdout | trim == plex_molecule_extra_volume_marker
+            that:
+              - plex_extra_volume.rc == 0
+              - plex_extra_volume.stdout | trim == plex_molecule_extra_volume_marker
             fail_msg: "The additional volume did not carry the marker into the container"
             success_msg: "The additional volume carries the marker into the container"
 
@@ -348,13 +352,16 @@
             fail_msg: "The Traefik labels are not what templates/labels.j2 should have produced: {{ plex_container.Config.Labels }}"
             success_msg: "The Traefik labels route {{ plex_expected_hostname }}{{ plex_expected_path_prefix }} to port 32400"
 
-        - name: Assert the free-form label and extra argument reached the container
+        - name: Assert that the additional labels and extra arguments reached the container
           ansible.builtin.assert:
             that:
-              - plex_container.Config.Labels['mash.molecule.additional_label'] == 'present'
-              - plex_container.Config.Labels['mash.molecule.extra_argument'] == 'present'
-            fail_msg: "plex_container_labels_additional_labels or plex_container_extra_arguments went nowhere"
-            success_msg: "plex_container_labels_additional_labels and plex_container_extra_arguments reached the container"
+              - plex_container.Config.Labels['mash.molecule.additional-label'] == 'set-by-the-role'
+              - plex_container.Config.Labels['mash.molecule.extra-argument'] == 'set-by-the-role'
+            fail_msg: >-
+              plex_container_labels_additional_labels or
+              plex_container_extra_arguments did not reach the container:
+              {{ plex_container.Config.Labels }}
+            success_msg: "The additional label and the extra argument both reached the container"
 
         # ------------------------------------------------------------------
         # What the process inside the container actually sees
