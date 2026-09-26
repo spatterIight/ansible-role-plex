@@ -84,7 +84,10 @@ ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
 			{% for arg in plex_container_extra_arguments %}
 			{{ arg }} \
 			{% endfor %}
-			{{ plex_container_image }}
+			{{ plex_container_image }} \
+			{% for arg in plex_process_extra_arguments %}
+			{{ arg }} \
+			{% endfor %}
 
 {% for network in plex_container_additional_networks %}
 ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} network connect {{ network }} {{ plex_identifier }}

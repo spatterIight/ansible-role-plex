@@ -182,6 +182,12 @@ plex_container_extra_arguments: "{{ plex_container_extra_arguments_auto + plex_c
 plex_container_extra_arguments_auto: []
 plex_container_extra_arguments_custom: []
 
+# A list of extra arguments to pass to the process inside the container
+# Example: ['--SOME_ARGUMENT']
+plex_process_extra_arguments: "{{ plex_process_extra_arguments_auto + plex_process_extra_arguments_custom }}"
+plex_process_extra_arguments_auto: []
+plex_process_extra_arguments_custom: []
+
 # List of systemd services that the Plex systemd service depends on
 plex_systemd_required_services_list: "{{ (plex_systemd_required_services_list_default + plex_systemd_required_services_list_auto + plex_systemd_required_services_list_custom) | unique }}"
 plex_systemd_required_services_list_default: "{{ [devture_systemd_docker_base_docker_service_name] if devture_systemd_docker_base_docker_service_name else [] }}"
