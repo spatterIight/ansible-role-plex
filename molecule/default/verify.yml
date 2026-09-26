@@ -310,17 +310,21 @@
             fail_msg: "The role's volumes did not turn into the expected mounts: {{ plex_container.Mounts }}"
             success_msg: "The data path, the media path and plex_container_additional_volumes all became real mounts"
 
+        # Reading the file back from inside the
+        # container is the difference between the variable existing and it working.
         - name: Read the marker through the additional volume
           ansible.builtin.command:
             cmd: >-
               docker exec plex
               cat {{ plex_molecule_extra_volume_dst }}/{{ plex_molecule_marker_filename }}
-          register: plex_extra_volume_marker
+          register: plex_extra_volume
           changed_when: false
 
-        - name: Assert the additional volume carries data into the container
+        - name: Assert the additional volume is mounted into the Plex container
           ansible.builtin.assert:
-            that: plex_extra_volume_marker.stdout | trim == plex_molecule_extra_volume_marker
+            that:
+              - plex_extra_volume.rc == 0
+              - plex_extra_volume.stdout | trim == plex_molecule_extra_volume_marker
             fail_msg: "The additional volume did not carry the marker into the container"
             success_msg: "The additional volume carries the marker into the container"
 
