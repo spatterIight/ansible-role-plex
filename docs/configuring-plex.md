@@ -69,7 +69,7 @@ This case, the directory specified with `plex_media_path` on the host machine wi
 To mount additional data directories, add the following configuration to your `vars.yml` file (adapt to your needs):
 
 ```yaml
-plex_container_additional_volumes:
+plex_container_additional_volumes_custom:
   - type: bind
     src: /path/to/blackhole
     dst: /downloads
@@ -187,7 +187,7 @@ After running the command for installation, Plex Media Server becomes available 
 
 To get started, open the URL with a web browser, and follow the set up wizard.
 
-When prompted to add your media libraries keep in mind that it will be the path **inside** the container, most likely the `dst` parameter of your `plex_container_additional_volumes` variable.
+When prompted to add your media libraries keep in mind that it will be the path **inside** the container, most likely the `dst` parameter of your `plex_container_additional_volumes_custom` variable.
 
 ## Troubleshooting
 
