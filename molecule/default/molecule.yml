@@ -93,10 +93,10 @@ provisioner:
             options: readonly
 
         plex_container_labels_additional_labels:
-          - mash.molecule.additional_label=present
+          - mash.molecule.additional-label=present
 
         plex_container_extra_arguments:
-          - "--label=mash.molecule.extra_argument=present"
+          - "--label=mash.molecule.extra-argument=present"
 
         # Neither the role's default of Etc/UTC nor the test host's zone, so
         # that the timezone the container ends up in can only have come from

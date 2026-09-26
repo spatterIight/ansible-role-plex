@@ -351,8 +351,8 @@
         - name: Assert the free-form label and extra argument reached the container
           ansible.builtin.assert:
             that:
-              - plex_container.Config.Labels['mash.molecule.additional_label'] == 'present'
-              - plex_container.Config.Labels['mash.molecule.extra_argument'] == 'present'
+              - plex_container.Config.Labels['mash.molecule.additional-label'] == 'present'
+              - plex_container.Config.Labels['mash.molecule.extra-argument'] == 'present'
             fail_msg: "plex_container_labels_additional_labels or plex_container_extra_arguments went nowhere"
             success_msg: "plex_container_labels_additional_labels and plex_container_extra_arguments reached the container"
 
