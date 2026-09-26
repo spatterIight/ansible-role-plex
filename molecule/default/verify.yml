@@ -410,7 +410,7 @@
           vars:
             plex_environment_variables_plex_claim: "{{ plex_molecule_fake_claim_token }}"
             plex_environment_variables_version: "{{ plex_defaults.plex_environment_variables_version }}"
-            plex_nvidia_visible_devices: "{{ plex_defaults.plex_nvidia_visible_devices }}"
+            plex_environment_variables_nvidia_visible_devices: "{{ plex_defaults.plex_environment_variables_nvidia_visible_devices }}"
           changed_when: false
 
         - name: Read the env file rendered with a claim token configured

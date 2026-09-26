@@ -158,7 +158,7 @@ plex_container_runtime: "nvidia"
 
 # To enable NVIDIA GPU hardware acceleration this value should either be 'all' or the UUID value of the GPU
 # which can obtained with the command -> 'nvidia-smi --query-gpu=gpu_name,gpu_uuid --format=csv'
-plex_nvidia_visible_devices: "all"
+plex_environment_variables_nvidia_visible_devices: "all"
 ```
 
 Upstream documentation: <https://docs.linuxserver.io/images/docker-plex/#nvidia>

@@ -24,7 +24,7 @@ plex_media_path: "{{ plex_base_path }}/media"
 plex_media_bind_path: ""
 
 # The path where the Intel/AMD GPU is on the host system
-# For NVIDIA GPUs see 'plex_nvidia_visible_devices' and 'plex_container_runtime'
+# For NVIDIA GPUs see 'plex_environment_variables_nvidia_visible_devices' and 'plex_container_runtime'
 # https://docs.linuxserver.io/images/docker-plex/#intelatiamd
 plex_gpu_path: "/dev/dri"
 
@@ -321,7 +321,7 @@ plex_container_runtime: ""
 # which can obtained with the command -> 'nvidia-smi --query-gpu=gpu_name,gpu_uuid --format=csv'
 #
 # https://docs.linuxserver.io/images/docker-plex/#nvidia
-plex_nvidia_visible_devices: ""
+plex_environment_variables_nvidia_visible_devices: ""
 
 # Specify the timezone
 plex_environment_variables_tz: "Etc/UTC"
