@@ -250,7 +250,7 @@
         - name: Assert the role's environment reached the container
           ansible.builtin.assert:
             that:
-              - "'VERSION=' ~ plex_defaults.plex_version_environment_variable in plex_container.Config.Env"
+              - "'VERSION=' ~ plex_defaults.plex_environment_variables_version in plex_container.Config.Env"
               - "'PLEX_MOLECULE_MARKER=rendered-by-the-role' in plex_container.Config.Env"
               # No claim token was configured, so none may be passed. An empty
               # `PLEX_CLAIM=` is not the same thing as no `PLEX_CLAIM` at all.
@@ -409,7 +409,7 @@
             mode: "0600"
           vars:
             plex_claim_token: "{{ plex_molecule_fake_claim_token }}"
-            plex_version_environment_variable: "{{ plex_defaults.plex_version_environment_variable }}"
+            plex_environment_variables_version: "{{ plex_defaults.plex_environment_variables_version }}"
             plex_nvidia_visible_devices: "{{ plex_defaults.plex_nvidia_visible_devices }}"
           changed_when: false
 

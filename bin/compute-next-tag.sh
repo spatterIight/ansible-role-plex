@@ -58,7 +58,7 @@ role_defining_paths=(
 
 # Anchored at the start of the line and requiring the colon immediately after
 # the variable name, so that neither the `# renovate:` annotation directly
-# above the variable, nor `plex_version_environment_variable` (which starts
+# above the variable, nor `plex_environment_variables_version` (which starts
 # with the same 12 characters), nor `plex_container_image_tag` (which is
 # derived from it) can be picked up instead.
 version="$(sed -nE 's|^plex_version:[[:space:]]*"?([^"[:space:]]+)"?.*$|\1|p' "$defaults_path" | head -n1)"

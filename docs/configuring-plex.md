@@ -125,7 +125,7 @@ plex_gid: 0
 plex_container_read_only: false
 ```
 
-You'll also want to set `plex_version_environment_variable` to `latest` or `public`.
+You'll also want to set `plex_environment_variables_version` to `latest` or `public`.
 
 ### Hardware Acceleration
 

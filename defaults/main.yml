@@ -326,7 +326,7 @@ plex_nvidia_visible_devices: ""
 # Specify the timezone
 plex_environment_variables_tz: "Etc/UTC"
 
-# Valid settings for 'plex_version_environment_variable' are:
+# Valid settings for 'plex_environment_variables_version' are:
 #
 # 1. docker: Let Docker handle the Plex Version, we keep our Dockerhub Endpoint up to date with the latest public builds.
 # 2. latest: will update plex to the latest version available that you are entitled to.
@@ -336,7 +336,7 @@ plex_environment_variables_tz: "Etc/UTC"
 # NOTE -> You cannot update to a PlexPass only (beta) version if you are not logged in with a PlexPass account
 # NOTE -> You must set 'plex_container_read_only' to false if you set a value that is not 'docker'
 # https://github.com/linuxserver/docker-plex#application-setup
-plex_version_environment_variable: docker
+plex_environment_variables_version: docker
 
 # plex_environment_variables_additional_variables contains a multiline string with additional environment variables to pass to the container.
 #
