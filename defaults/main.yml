@@ -177,8 +177,10 @@ plex_container_labels_additional_labels: "{{ plex_container_labels_additional_la
 plex_container_labels_additional_labels_auto: []
 plex_container_labels_additional_labels_custom: []
 
-# A list of extra arguments to pass to the container
-plex_container_extra_arguments: []
+# A list of extra arguments to pass to the container (`docker create` command)
+plex_container_extra_arguments: "{{ plex_container_extra_arguments_auto + plex_container_extra_arguments_custom }}"
+plex_container_extra_arguments_auto: []
+plex_container_extra_arguments_custom: []
 
 # List of systemd services that the Plex systemd service depends on
 plex_systemd_required_services_list: "{{ (plex_systemd_required_services_list_default + plex_systemd_required_services_list_auto + plex_systemd_required_services_list_custom) | unique }}"
