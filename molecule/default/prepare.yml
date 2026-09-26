@@ -44,17 +44,20 @@
         plex_molecule_extra_network_result.rc != 0
         and 'already exists' not in plex_molecule_extra_network_result.stderr
 
-    # Read back from inside the container later on, which is the only way to
-    # tell a `plex_container_additional_volumes` entry that became a real
-    # `--mount` from one that was silently dropped.
-    - name: Ensure the extra bind-mount source for Plex Molecule tests exists
+    # Bind-mounted into the Plex container through
+    # `plex_container_additional_volumes`. The role does not create the source
+    # of an additional volume, so it has to exist before the container is
+    # created, or `docker create` refuses the bind. verify.yml reads the marker
+    # file back from inside the container, which only works if the systemd unit
+    # really carries the additional volumes.
+    - name: Ensure the additional volume directory exists for Plex Molecule tests
       ansible.builtin.file:
-        path: "{{ plex_molecule_extra_volume_host_path }}"
+        path: "{{ plex_molecule_extra_volume_src }}"
         state: directory
         mode: "0755"
 
-    - name: Ensure the extra bind-mount source for Plex Molecule tests holds a marker
+    - name: Ensure a marker file exists in the Plex Molecule additional volume
       ansible.builtin.copy:
         content: "{{ plex_molecule_extra_volume_marker }}\n"
-        dest: "{{ plex_molecule_extra_volume_host_path }}/marker"
+        dest: "{{ plex_molecule_extra_volume_src }}/{{ plex_molecule_marker_filename }}"
         mode: "0644"

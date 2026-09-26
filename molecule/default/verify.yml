@@ -302,11 +302,11 @@
               - plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | list | length == 1
               - (plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | first).Source == plex_molecule_data_path
               - plex_container.Mounts | selectattr('Destination', 'equalto', plex_media_bind_path) | list | length == 1
-              - plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_container_path) | list | length == 1
+              - plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | list | length == 1
               - >-
-                (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_container_path) | first).Source
-                == plex_molecule_extra_volume_host_path
-              - not (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_container_path) | first).RW
+                (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | first).Source
+                == plex_molecule_extra_volume_src
+              - not (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | first).RW
             fail_msg: "The role's volumes did not turn into the expected mounts: {{ plex_container.Mounts }}"
             success_msg: "The data path, the media path and plex_container_additional_volumes all became real mounts"
 
@@ -314,7 +314,7 @@
           ansible.builtin.command:
             cmd: >-
               docker exec plex
-              cat {{ plex_molecule_extra_volume_container_path }}/marker
+              cat {{ plex_molecule_extra_volume_dst }}/{{ plex_molecule_marker_filename }}
           register: plex_extra_volume_marker
           changed_when: false
 
