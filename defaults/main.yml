@@ -307,7 +307,7 @@ plex_container_read_only: true
 #
 # Link to obtain -> https://plex.tv/claim
 # Keep in mind that the claim token expires after 4 minutes.
-plex_claim_token: ""
+plex_environment_variables_plex_claim: ""
 
 # The container runtime that the container engine should use
 # Should be set to 'nvidia' to enable NVIDIA GPU hardware acceleration,

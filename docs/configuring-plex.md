@@ -108,7 +108,7 @@ Since the container is configured to run in "host" networking mode, it is requir
 To specify the token, add the following configuration to your `vars.yml` file:
 
 ```yaml
-plex_claim_token: YOUR_PLEX_CLAIM_TOKEN_HERE
+plex_environment_variables_plex_claim: YOUR_PLEX_CLAIM_TOKEN_HERE
 ```
 
 >[!NOTE]

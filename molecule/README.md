@@ -56,7 +56,7 @@ Here is a synopsis of what a successful run proves. Check the scenario itself fo
 - The role's configuration reaches the process
 - The container is built the way the role's variables say
 - The Traefik labels describe what was deployed
-- `plex_claim_token` is plumbed through
+- `plex_environment_variables_plex_claim` is plumbed through
 
 What it does not prove:
 

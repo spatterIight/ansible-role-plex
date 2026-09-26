@@ -396,8 +396,8 @@
               # satisfying the check below for the wrong reason.
               - "'PUID=' ~ plex_uid in (plex_env_file.content | b64decode)"
               - "'PLEX_CLAIM' not in (plex_env_file.content | b64decode)"
-            fail_msg: "templates/env.j2 emitted a PLEX_CLAIM line without a plex_claim_token: {{ plex_env_file.content | b64decode }}"
-            success_msg: "templates/env.j2 emits no PLEX_CLAIM line when no plex_claim_token is set"
+            fail_msg: "templates/env.j2 emitted a PLEX_CLAIM line without a plex_environment_variables_plex_claim: {{ plex_env_file.content | b64decode }}"
+            success_msg: "templates/env.j2 emits no PLEX_CLAIM line when no plex_environment_variables_plex_claim is set"
 
         # A real claim token cannot be exercised (see molecule/README.md), but the
         # plumbing that would carry one can be: the same template is rendered out
@@ -408,7 +408,7 @@
             dest: /tmp/plex-env-with-claim-token
             mode: "0600"
           vars:
-            plex_claim_token: "{{ plex_molecule_fake_claim_token }}"
+            plex_environment_variables_plex_claim: "{{ plex_molecule_fake_claim_token }}"
             plex_environment_variables_version: "{{ plex_defaults.plex_environment_variables_version }}"
             plex_nvidia_visible_devices: "{{ plex_defaults.plex_nvidia_visible_devices }}"
           changed_when: false
@@ -423,8 +423,8 @@
             that: >-
               'PLEX_CLAIM=' ~ plex_molecule_fake_claim_token
               in (plex_env_file_with_claim_token.content | b64decode)
-            fail_msg: "templates/env.j2 dropped plex_claim_token on the floor"
-            success_msg: "templates/env.j2 passes plex_claim_token through as PLEX_CLAIM"
+            fail_msg: "templates/env.j2 dropped plex_environment_variables_plex_claim on the floor"
+            success_msg: "templates/env.j2 passes plex_environment_variables_plex_claim through as PLEX_CLAIM"
 
         - name: Verify nothing was quietly restarting while all of that was being checked
           when: "plex_restarts_check_enabled | bool"
