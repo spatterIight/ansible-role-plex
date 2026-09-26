@@ -61,64 +61,73 @@ plex_container_network_deletion_enabled: true
 # For information on all the ports Plex may use, and what they do, see the below docs
 # https://github.com/linuxserver/docker-plex#optional-parameters
 
-# Controls whether the container exposes the HTTP port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32400"), or empty string to not expose.
+# Specify how the container publishes its HTTP port (as defined by `plex_container_http_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 plex_container_http_bind_port: ""
 
 # The port Plex is serving the HTTP web application on inside the container
 plex_container_http_port: 32400
 
-# Controls whether the container exposes the DLNA UDP port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:1900"), or empty string to not expose.
+# Specify how the container publishes its DLNA UDP port (as defined by `plex_container_dlna_udp_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 plex_container_dlna_udp_bind_port: ""
 
 # The port Plex is serving the DLNA server on inside the container
 plex_container_dlna_udp_port: 1900
 
-# Controls whether the container exposes the 32469 TCP port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32469"), or empty string to not expose.
+# Specify how the container publishes its 32469 TCP port (as defined by `plex_container_dlna_tcp_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 plex_container_dlna_tcp_bind_port: ""
 
 # The port Plex is serving the DLNA server on inside the container
 plex_container_dlna_tcp_port: 32469
 
-# Controls whether the container exposes the Bonjour/Avahi port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:5353"), or empty string to not expose.
+# Specify how the container publishes its Bonjour/Avahi port (as defined by `plex_container_bonjour_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 plex_container_bonjour_bind_port: ""
 
 # The port Plex is serving the Bonjour/Avahi server on inside the container
 plex_container_bonjour_port: 5353
 
-# Controls whether the container exposes the 'Plex for Roku via Plex Companion' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:8324"), or empty string to not expose.
+# Specify how the container publishes its 'Plex for Roku via Plex Companion' port (as defined by `plex_container_roku_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 plex_container_roku_bind_port: ""
 
 # The port Plex is serving the 'Plex for Roku via Plex Companion' server on inside the container
 plex_container_roku_port: 8324
 
-# Controls whether the container exposes the 'GDM network discovery' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32410"), or empty string to not expose.
+# Specify how the container publishes its 'GDM network discovery' port (as defined by `plex_container_gdm_port_01`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 plex_container_gdm_bind_port_01: ""
 
 # The port Plex is serving the 'GDM network discovery' server on inside the container
 plex_container_gdm_port_01: 32410
 
-# Controls whether the container exposes the 'GDM network discovery' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32412"), or empty string to not expose.
+# Specify how the container publishes its 'GDM network discovery' port (as defined by `plex_container_gdm_port_02`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 plex_container_gdm_bind_port_02: ""
 
 # The port Plex is serving the 'GDM network discovery' server on inside the container
 plex_container_gdm_port_02: 32412
 
-# Controls whether the container exposes the 'GDM network discovery' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32413"), or empty string to not expose.
+# Specify how the container publishes its 'GDM network discovery' port (as defined by `plex_container_gdm_port_03`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 plex_container_gdm_bind_port_03: ""
 
 # The port Plex is serving the 'GDM network discovery' server on inside the container
 plex_container_gdm_port_03: 32413
 
-# Controls whether the container exposes the 'GDM network discovery' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32414"), or empty string to not expose.
+# Specify how the container publishes its 'GDM network discovery' port (as defined by `plex_container_gdm_port_04`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
 plex_container_gdm_bind_port_04: ""
 
 # The port Plex is serving the 'GDM network discovery' server on inside the container
@@ -126,26 +135,22 @@ plex_container_gdm_port_04: 32414
 
 # A list of additional container networks that the container would be connected to.
 # The role does not create these networks, so make sure they already exist.
+# Use this to expose this container to another reverse proxy, which runs in a different container network.
 plex_container_additional_networks: "{{ (plex_container_additional_networks_default + plex_container_additional_networks_auto + plex_container_additional_networks_custom) | unique }}"
 plex_container_additional_networks_default: []
 plex_container_additional_networks_auto: []
 plex_container_additional_networks_custom: []
 
 # A list of additional "volumes" to mount in the container.
-#
+# This list gets populated dynamically at runtime. You can provide a different default value,
+# if you wish to mount your own files into the container.
+# Contains definition objects like this: `{"type": "bind", "src": "/outside", "dst": "/inside", "options": "readonly"}.
 # See the `--mount` documentation for the `docker run` command.
-#
-# Example:
-# plex_container_additional_volumes:
-#   - type: bind
-#     src: /path/on/the/host
-#     dst: /data
-#   - type: bind
-#     src: /another-path/on/the/host
-#     dst: /read-only
-#     options: readonly
 plex_container_additional_volumes: []
 
+# plex_container_labels_traefik_enabled controls whether labels to assist a Traefik reverse-proxy will be attached to the container.
+# See `../templates/labels.j2` for details.
+#
 # To inject your own other container labels, see `plex_container_labels_additional_labels`.
 plex_container_labels_traefik_enabled: true
 plex_container_labels_traefik_docker_network: "{{ plex_container_network }}"
