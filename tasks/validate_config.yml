@@ -35,6 +35,13 @@
 - name: Validate Plex Traefik configuration
   when: plex_container_labels_traefik_enabled | bool
   block:
+    - name: (Deprecation) Catch and report Plex labels for Traefik in the old string format
+      ansible.builtin.fail:
+        msg: >-
+          `plex_container_labels_additional_labels` now require a list of strings.
+          Replace `plex_container_labels_additional_labels: |` with `plex_container_labels_additional_labels_custom:` and make each label a list item.
+      when: "plex_container_labels_additional_labels | default([]) is string"
+
     - name: Fail if required Plex Traefik settings not defined
       ansible.builtin.fail:
         msg: >-

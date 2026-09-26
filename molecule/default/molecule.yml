@@ -103,8 +103,8 @@ provisioner:
         plex_environment_variables_additional_variables: |
           PLEX_MOLECULE_MARKER=rendered-by-the-role
 
-        plex_container_labels_additional_labels: |
-          mash.molecule.additional_label=present
+        plex_container_labels_additional_labels:
+          - mash.molecule.additional_label=present
   env:
     # Workaround for https://github.com/ansible/molecule/issues/4391
     ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..:/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles:~/.ansible/roles

@@ -41,4 +41,6 @@ traefik.http.routers.{{ plex_identifier }}.tls.certResolver={{ plex_container_la
 traefik.http.services.{{ plex_identifier }}.loadbalancer.server.port={{ plex_container_http_port }}
 {% endif %}
 
-{{ plex_container_labels_additional_labels }}
+{% for arg in plex_container_labels_additional_labels %}
+{{ arg }}
+{% endfor %}
