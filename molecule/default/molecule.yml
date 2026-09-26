@@ -101,10 +101,10 @@ provisioner:
             options: readonly
 
         plex_container_labels_additional_labels:
-          - mash.molecule.additional-label=present
+          - mash.molecule.additional-label=set-by-the-role
 
         plex_container_extra_arguments:
-          - "--label=mash.molecule.extra-argument=present"
+          - "--label=mash.molecule.extra-argument=set-by-the-role"
 
         # Neither the role's default of Etc/UTC nor the test host's zone, so
         # that the timezone the container ends up in can only have come from
