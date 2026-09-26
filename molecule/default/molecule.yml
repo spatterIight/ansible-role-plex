@@ -81,7 +81,7 @@ provisioner:
         # checked instead is the mapping: the published ports deliberately
         # differ from the container ports, so a role that ignored either
         # variable would publish nothing on them.
-        plex_container_http_bind_port: "127.0.0.1:32499"
+        plex_container_http_host_bind_port: "127.0.0.1:32499"
         plex_container_dlna_tcp_bind_port: "127.0.0.1:32479"
 
         # Mounting media exercises the `plex_media_bind_path` code path, which

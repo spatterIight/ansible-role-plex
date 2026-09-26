@@ -40,8 +40,8 @@ ExecStartPre={{ devture_systemd_docker_base_host_command_docker }} create \
 			--read-only \
 			{% endif %}
 			--network={{ plex_container_network }} \
-			{% if plex_container_http_bind_port %}
-			-p {{ plex_container_http_bind_port }}:{{ plex_container_http_port }} \
+			{% if plex_container_http_host_bind_port %}
+			-p {{ plex_container_http_host_bind_port }}:{{ plex_container_http_port }} \
 			{% endif %}
 			{% if plex_container_dlna_udp_bind_port %}
 			-p {{ plex_container_dlna_udp_bind_port }}:{{ plex_container_dlna_udp_port }}/udp \

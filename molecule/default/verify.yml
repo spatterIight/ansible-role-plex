@@ -37,7 +37,7 @@
   gather_facts: false
 
   vars:
-    plex_molecule_http_port: "{{ plex_container_http_bind_port.split(':') | last }}"
+    plex_molecule_http_port: "{{ plex_container_http_host_bind_port.split(':') | last }}"
     plex_molecule_preferences_path: >-
       {{ plex_molecule_data_path }}/Library/Application Support/Plex Media Server/Preferences.xml
 
@@ -156,7 +156,7 @@
 
         # The published port differs from the container port on purpose, so this
         # answering at all means the role's `-p` mapping was rendered from both
-        # `plex_container_http_bind_port` and `plex_container_http_port`.
+        # `plex_container_http_host_bind_port` and `plex_container_http_port`.
         - name: Wait for Plex to answer on the port the role published
           ansible.builtin.uri:
             url: "http://127.0.0.1:{{ plex_molecule_http_port }}/identity"
@@ -280,7 +280,7 @@
             fail_msg: "The published ports are not what the role was configured for: {{ plex_container.NetworkSettings.Ports }}"
             success_msg: >-
               Container port {{ plex_defaults.plex_container_http_port }} is published on
-              {{ plex_container_http_bind_port }}, and no port the role was not asked to publish is
+              {{ plex_container_http_host_bind_port }}, and no port the role was not asked to publish is
 
         - name: Assert the container filesystem is read-only, with a writable /run
           ansible.builtin.assert:
