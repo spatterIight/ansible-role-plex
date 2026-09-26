@@ -324,7 +324,7 @@ plex_container_runtime: ""
 plex_nvidia_visible_devices: ""
 
 # Specify the timezone
-plex_timezone: "Etc/UTC"
+plex_environment_variables_tz: "Etc/UTC"
 
 # Valid settings for 'plex_version_environment_variable' are:
 #

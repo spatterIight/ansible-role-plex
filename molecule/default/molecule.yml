@@ -73,7 +73,7 @@ provisioner:
         # Neither the role's default of Etc/UTC nor the test host's zone, so
         # that the timezone the container ends up in can only have come from
         # templates/env.j2.
-        plex_timezone: Asia/Tokyo
+        plex_environment_variables_tz: Asia/Tokyo
 
         # Plex Media Server always listens on 32400 inside the container and
         # offers no supported way to move it, so `plex_container_http_port`
