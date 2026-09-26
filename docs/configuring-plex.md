@@ -69,7 +69,7 @@ This case, the directory specified with `plex_media_path` on the host machine wi
 To mount additional data directories, add the following configuration to your `vars.yml` file (adapt to your needs):
 
 ```yaml
-plex_container_additional_volumes:
+plex_container_additional_volumes_custom:
   - type: bind
     src: /path/to/blackhole
     dst: /downloads
@@ -108,7 +108,7 @@ Since the container is configured to run in "host" networking mode, it is requir
 To specify the token, add the following configuration to your `vars.yml` file:
 
 ```yaml
-plex_claim_token: YOUR_PLEX_CLAIM_TOKEN_HERE
+plex_environment_variables_plex_claim: YOUR_PLEX_CLAIM_TOKEN_HERE
 ```
 
 >[!NOTE]
@@ -125,7 +125,7 @@ plex_gid: 0
 plex_container_read_only: false
 ```
 
-You'll also want to set `plex_version_environment_variable` to `latest` or `public`.
+You'll also want to set `plex_environment_variables_version` to `latest` or `public`.
 
 ### Hardware Acceleration
 
@@ -158,7 +158,7 @@ plex_container_runtime: "nvidia"
 
 # To enable NVIDIA GPU hardware acceleration this value should either be 'all' or the UUID value of the GPU
 # which can obtained with the command -> 'nvidia-smi --query-gpu=gpu_name,gpu_uuid --format=csv'
-plex_nvidia_visible_devices: "all"
+plex_environment_variables_nvidia_visible_devices: "all"
 ```
 
 Upstream documentation: <https://docs.linuxserver.io/images/docker-plex/#nvidia>
@@ -187,7 +187,7 @@ After running the command for installation, Plex Media Server becomes available 
 
 To get started, open the URL with a web browser, and follow the set up wizard.
 
-When prompted to add your media libraries keep in mind that it will be the path **inside** the container, most likely the `dst` parameter of your `plex_container_additional_volumes` variable.
+When prompted to add your media libraries keep in mind that it will be the path **inside** the container, most likely the `dst` parameter of your `plex_container_additional_volumes_custom` variable.
 
 ## Troubleshooting
 

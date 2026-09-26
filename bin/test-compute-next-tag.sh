@@ -36,7 +36,7 @@ trap cleanup EXIT
 # it. It must not be counted as a release of anything.
 #
 # The defaults file deliberately carries the traps this role's real one has:
-# the `# renovate:` annotation, `plex_version_environment_variable` (which
+# the `# renovate:` annotation, `plex_environment_variables_version` (which
 # starts with the same 12 characters as `plex_version`), and an image tag
 # derived from the version. None of them may be picked up as the version.
 scenario() {
@@ -58,7 +58,7 @@ scenario() {
 		# renovate: datasource=docker depName=ghcr.io/linuxserver/plex versioning=semver
 		plex_version: 1.43.3
 		plex_arch: amd64
-		plex_version_environment_variable: docker
+		plex_environment_variables_version: docker
 		plex_container_image_tag: "{{ plex_version }}"
 	YAML
 	printf 'placeholder\n' > tasks/main.yml
@@ -105,7 +105,7 @@ expect() {
 
 bump_version="sed -i 's|^plex_version: 1.43.3|plex_version: 1.43.4|' defaults/main.yml"
 revert_version="sed -i 's|^plex_version: 1.43.4|plex_version: 1.43.3|' defaults/main.yml"
-change_version_env="sed -i 's|^plex_version_environment_variable: docker|plex_version_environment_variable: latest|' defaults/main.yml"
+change_version_env="sed -i 's|^plex_environment_variables_version: docker|plex_environment_variables_version: latest|' defaults/main.yml"
 edit_task="printf 'a task\n' >> tasks/main.yml"
 edit_template="printf 'a line\n' >> templates/env.j2"
 edit_readme="printf 'documentation\n' >> README.md"
@@ -128,7 +128,7 @@ expect 'version bump' v1.43.4-0 "$(merge "$bump_version")"
 scenario 'The bogus tag left over from the commit-message era'
 expect 'a task' v1.43.3-2 "$(merge "$edit_task")"
 
-# `plex_version_environment_variable` shares its first 12 characters with
+# `plex_environment_variables_version` shares its first 12 characters with
 # `plex_version`, so a laxer expression would read `docker` as the version and
 # produce a `vdocker-0` tag.
 scenario 'The version-like variable that is not the version'

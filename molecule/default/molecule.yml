@@ -73,7 +73,7 @@ provisioner:
         # Neither the role's default of Etc/UTC nor the test host's zone, so
         # that the timezone the container ends up in can only have come from
         # templates/env.j2.
-        plex_timezone: Asia/Tokyo
+        plex_environment_variables_tz: Asia/Tokyo
 
         # Plex Media Server always listens on 32400 inside the container and
         # offers no supported way to move it, so `plex_container_http_port`
@@ -81,7 +81,7 @@ provisioner:
         # checked instead is the mapping: the published ports deliberately
         # differ from the container ports, so a role that ignored either
         # variable would publish nothing on them.
-        plex_container_http_bind_port: "127.0.0.1:32499"
+        plex_container_http_host_bind_port: "127.0.0.1:32499"
         plex_container_dlna_tcp_bind_port: "127.0.0.1:32479"
 
         # Mounting media exercises the `plex_media_bind_path` code path, which
@@ -103,8 +103,8 @@ provisioner:
         plex_environment_variables_additional_variables: |
           PLEX_MOLECULE_MARKER=rendered-by-the-role
 
-        plex_container_labels_additional_labels: |
-          mash.molecule.additional_label=present
+        plex_container_labels_additional_labels:
+          - mash.molecule.additional_label=present
   env:
     # Workaround for https://github.com/ansible/molecule/issues/4391
     ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..:/.ansible/roles:/usr/share/ansible/roles:/etc/ansible/roles:~/.ansible/roles

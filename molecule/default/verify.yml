@@ -37,7 +37,7 @@
   gather_facts: false
 
   vars:
-    plex_molecule_http_port: "{{ plex_container_http_bind_port.split(':') | last }}"
+    plex_molecule_http_port: "{{ plex_container_http_host_bind_port.split(':') | last }}"
     plex_molecule_preferences_path: >-
       {{ plex_molecule_data_path }}/Library/Application Support/Plex Media Server/Preferences.xml
 
@@ -156,7 +156,7 @@
 
         # The published port differs from the container port on purpose, so this
         # answering at all means the role's `-p` mapping was rendered from both
-        # `plex_container_http_bind_port` and `plex_container_http_port`.
+        # `plex_container_http_host_bind_port` and `plex_container_http_port`.
         - name: Wait for Plex to answer on the port the role published
           ansible.builtin.uri:
             url: "http://127.0.0.1:{{ plex_molecule_http_port }}/identity"
@@ -250,7 +250,7 @@
         - name: Assert the role's environment reached the container
           ansible.builtin.assert:
             that:
-              - "'VERSION=' ~ plex_defaults.plex_version_environment_variable in plex_container.Config.Env"
+              - "'VERSION=' ~ plex_defaults.plex_environment_variables_version in plex_container.Config.Env"
               - "'PLEX_MOLECULE_MARKER=rendered-by-the-role' in plex_container.Config.Env"
               # No claim token was configured, so none may be passed. An empty
               # `PLEX_CLAIM=` is not the same thing as no `PLEX_CLAIM` at all.
@@ -280,7 +280,7 @@
             fail_msg: "The published ports are not what the role was configured for: {{ plex_container.NetworkSettings.Ports }}"
             success_msg: >-
               Container port {{ plex_defaults.plex_container_http_port }} is published on
-              {{ plex_container_http_bind_port }}, and no port the role was not asked to publish is
+              {{ plex_container_http_host_bind_port }}, and no port the role was not asked to publish is
 
         - name: Assert the container filesystem is read-only, with a writable /run
           ansible.builtin.assert:
@@ -396,8 +396,8 @@
               # satisfying the check below for the wrong reason.
               - "'PUID=' ~ plex_uid in (plex_env_file.content | b64decode)"
               - "'PLEX_CLAIM' not in (plex_env_file.content | b64decode)"
-            fail_msg: "templates/env.j2 emitted a PLEX_CLAIM line without a plex_claim_token: {{ plex_env_file.content | b64decode }}"
-            success_msg: "templates/env.j2 emits no PLEX_CLAIM line when no plex_claim_token is set"
+            fail_msg: "templates/env.j2 emitted a PLEX_CLAIM line without a plex_environment_variables_plex_claim: {{ plex_env_file.content | b64decode }}"
+            success_msg: "templates/env.j2 emits no PLEX_CLAIM line when no plex_environment_variables_plex_claim is set"
 
         # A real claim token cannot be exercised (see molecule/README.md), but the
         # plumbing that would carry one can be: the same template is rendered out
@@ -408,9 +408,9 @@
             dest: /tmp/plex-env-with-claim-token
             mode: "0600"
           vars:
-            plex_claim_token: "{{ plex_molecule_fake_claim_token }}"
-            plex_version_environment_variable: "{{ plex_defaults.plex_version_environment_variable }}"
-            plex_nvidia_visible_devices: "{{ plex_defaults.plex_nvidia_visible_devices }}"
+            plex_environment_variables_plex_claim: "{{ plex_molecule_fake_claim_token }}"
+            plex_environment_variables_version: "{{ plex_defaults.plex_environment_variables_version }}"
+            plex_environment_variables_nvidia_visible_devices: "{{ plex_defaults.plex_environment_variables_nvidia_visible_devices }}"
           changed_when: false
 
         - name: Read the env file rendered with a claim token configured
@@ -423,8 +423,8 @@
             that: >-
               'PLEX_CLAIM=' ~ plex_molecule_fake_claim_token
               in (plex_env_file_with_claim_token.content | b64decode)
-            fail_msg: "templates/env.j2 dropped plex_claim_token on the floor"
-            success_msg: "templates/env.j2 passes plex_claim_token through as PLEX_CLAIM"
+            fail_msg: "templates/env.j2 dropped plex_environment_variables_plex_claim on the floor"
+            success_msg: "templates/env.j2 passes plex_environment_variables_plex_claim through as PLEX_CLAIM"
 
         - name: Verify nothing was quietly restarting while all of that was being checked
           when: "plex_restarts_check_enabled | bool"

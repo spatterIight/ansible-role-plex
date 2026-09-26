@@ -23,6 +23,15 @@ plex_media_path: "{{ plex_base_path }}/media"
 # Takes a path value (e.g. "/media"), or empty string to not mount.
 plex_media_bind_path: ""
 
+# The path where the Intel/AMD GPU is on the host system
+# For NVIDIA GPUs see 'plex_environment_variables_nvidia_visible_devices' and 'plex_container_runtime'
+# https://docs.linuxserver.io/images/docker-plex/#intelatiamd
+plex_gpu_path: "/dev/dri"
+
+# The path to mount the Intel/AMD GPU to in the container.
+# Takes a path value (e.g. "/dev/dri"), or empty string to not mount.
+plex_gpu_bind_path: ""
+
 # renovate: datasource=docker depName=ghcr.io/linuxserver/plex versioning=semver
 plex_version: 1.43.4
 plex_arch: amd64
@@ -37,64 +46,214 @@ plex_hostname: ""
 # This value must either be `/` or not end with a slash (e.g. `/plex`).
 plex_path_prefix: /
 
-# Valid settings for 'plex_version_environment_variable' are:
-#
-# 1. docker: Let Docker handle the Plex Version, we keep our Dockerhub Endpoint up to date with the latest public builds.
-# 2. latest: will update plex to the latest version available that you are entitled to.
-# 3. public: will update plexpass users to the latest public version, useful for plexpass users that don't want to be on the bleeding edge but still want the latest public updates.
-# 4. <specific-version>: will select a specific version (eg 0.9.12.4.1192-9a47d21) of plex to install, note you cannot use this to access plexpass versions if you do not have plexpass.
-#
-# NOTE -> You cannot update to a PlexPass only (beta) version if you are not logged in with a PlexPass account
-# NOTE -> You must set 'plex_container_read_only' to false if you set a value that is not 'docker'
-# https://github.com/linuxserver/docker-plex#application-setup
-plex_version_environment_variable: docker
-
-# Controls whether the container filesystem is read-only
-# To enable runtime update of Plex (and thus Plexpass builds) this value must be false
-plex_container_read_only: true
-
-# The path where the Intel/AMD GPU is on the host system
-# For NVIDIA GPUs see 'plex_nvidia_visible_devices' and 'plex_container_runtime'
-# https://docs.linuxserver.io/images/docker-plex/#intelatiamd
-plex_gpu_path: "/dev/dri"
-
-# The path to mount the Intel/AMD GPU to in the container.
-# Takes a path value (e.g. "/dev/dri"), or empty string to not mount.
-plex_gpu_bind_path: ""
-
-# Since the container is NOT run in 'host' networking mode
-# it is required that a claim token be provided during first time setup
-#
-# Link to obtain -> https://plex.tv/claim
-# Keep in mind that the claim token expires after 4 minutes.
-plex_claim_token: ""
-
-# The container runtime that the container engine should use
-# Should be set to 'nvidia' to enable NVIDIA GPU hardware acceleration,
-# NOTE -> Requires that the https://github.com/NVIDIA/nvidia-container-toolkit is installed
-#
-# If blank the default runtime is used
-# https://docs.linuxserver.io/images/docker-plex/#nvidia
-plex_container_runtime: ""
-
-# To enable NVIDIA GPU hardware acceleration this value should either be 'all' or the UUID value of the GPU
-# which can obtained with the command -> 'nvidia-smi --query-gpu=gpu_name,gpu_uuid --format=csv'
-#
-# https://docs.linuxserver.io/images/docker-plex/#nvidia
-plex_nvidia_visible_devices: ""
-
 plex_container_image: "{{ plex_container_image_registry_prefix }}linuxserver/plex:{{ plex_container_image_tag }}"
 plex_container_image_tag: "{{ plex_version }}"
 plex_container_image_registry_prefix: "{{ plex_container_image_registry_prefix_upstream }}"
 plex_container_image_registry_prefix_upstream: "{{ plex_container_image_registry_prefix_upstream_default }}"
 plex_container_image_registry_prefix_upstream_default: ghcr.io/
 
+# The base container network. It will be auto-created by this role if it doesn't exist already.
+plex_container_network: "{{ plex_identifier }}"
+
+# Control if the container network is deleted on uninstalling.
+plex_container_network_deletion_enabled: true
+
+# For information on all the ports Plex may use, and what they do, see the below docs
+# https://github.com/linuxserver/docker-plex#optional-parameters
+
+# Specify how the container publishes its HTTP port (as defined by `plex_container_http_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
+plex_container_http_host_bind_port: ""
+
+# The port Plex is serving the HTTP web application on inside the container
+plex_container_http_port: 32400
+
+# Specify how the container publishes its DLNA UDP port (as defined by `plex_container_dlna_udp_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
+plex_container_dlna_udp_bind_port: ""
+
+# The port Plex is serving the DLNA server on inside the container
+plex_container_dlna_udp_port: 1900
+
+# Specify how the container publishes its 32469 TCP port (as defined by `plex_container_dlna_tcp_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
+plex_container_dlna_tcp_bind_port: ""
+
+# The port Plex is serving the DLNA server on inside the container
+plex_container_dlna_tcp_port: 32469
+
+# Specify how the container publishes its Bonjour/Avahi port (as defined by `plex_container_bonjour_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
+plex_container_bonjour_bind_port: ""
+
+# The port Plex is serving the Bonjour/Avahi server on inside the container
+plex_container_bonjour_port: 5353
+
+# Specify how the container publishes its 'Plex for Roku via Plex Companion' port (as defined by `plex_container_roku_port`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
+plex_container_roku_bind_port: ""
+
+# The port Plex is serving the 'Plex for Roku via Plex Companion' server on inside the container
+plex_container_roku_port: 8324
+
+# Specify how the container publishes its 'GDM network discovery' port (as defined by `plex_container_gdm_port_01`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
+plex_container_gdm_bind_port_01: ""
+
+# The port Plex is serving the 'GDM network discovery' server on inside the container
+plex_container_gdm_port_01: 32410
+
+# Specify how the container publishes its 'GDM network discovery' port (as defined by `plex_container_gdm_port_02`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
+plex_container_gdm_bind_port_02: ""
+
+# The port Plex is serving the 'GDM network discovery' server on inside the container
+plex_container_gdm_port_02: 32412
+
+# Specify how the container publishes its 'GDM network discovery' port (as defined by `plex_container_gdm_port_03`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
+plex_container_gdm_bind_port_03: ""
+
+# The port Plex is serving the 'GDM network discovery' server on inside the container
+plex_container_gdm_port_03: 32413
+
+# Specify how the container publishes its 'GDM network discovery' port (as defined by `plex_container_gdm_port_04`).
+#
+# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:2586"), or empty string to not expose.
+plex_container_gdm_bind_port_04: ""
+
+# The port Plex is serving the 'GDM network discovery' server on inside the container
+plex_container_gdm_port_04: 32414
+
 # A list of additional container networks that the container would be connected to.
 # The role does not create these networks, so make sure they already exist.
+# Use this to expose this container to another reverse proxy, which runs in a different container network.
 plex_container_additional_networks: "{{ (plex_container_additional_networks_default + plex_container_additional_networks_auto + plex_container_additional_networks_custom) | unique }}"
 plex_container_additional_networks_default: []
 plex_container_additional_networks_auto: []
 plex_container_additional_networks_custom: []
+
+# A list of additional "volumes" to mount in the container.
+# This list gets populated dynamically at runtime. You can provide a different default value,
+# if you wish to mount your own files into the container.
+# Contains definition objects like this: `{"type": "bind", "src": "/outside", "dst": "/inside", "options": "readonly"}.
+# See the `--mount` documentation for the `docker run` command.
+plex_container_additional_volumes: "{{ plex_container_additional_volumes_auto + plex_container_additional_volumes_custom }}"
+plex_container_additional_volumes_auto: []
+plex_container_additional_volumes_custom: []
+
+# plex_container_labels_traefik_enabled controls whether labels to assist a Traefik reverse-proxy will be attached to the container.
+# See `../templates/labels.j2` for details.
+#
+# To inject your own other container labels, see `plex_container_labels_additional_labels_custom`.
+plex_container_labels_traefik_enabled: true
+plex_container_labels_traefik_docker_network: "{{ plex_container_network }}"
+plex_container_labels_traefik_hostname: "{{ plex_hostname }}"
+# The path prefix must either be `/` or not end with a slash (e.g. `/plex`).
+plex_container_labels_traefik_path_prefix: "{{ plex_path_prefix }}"
+plex_container_labels_traefik_rule: "Host(`{{ plex_container_labels_traefik_hostname }}`){% if plex_container_labels_traefik_path_prefix != '/' %} && PathPrefix(`{{ plex_container_labels_traefik_path_prefix }}`){% endif %}"
+plex_container_labels_traefik_priority: 0
+plex_container_labels_traefik_entrypoints: web-secure
+plex_container_labels_traefik_tls: "{{ plex_container_labels_traefik_entrypoints != 'web' }}"
+plex_container_labels_traefik_tls_certResolver: default # noqa var-naming
+
+# Controls which additional headers to attach to all HTTP requests.
+# To add your own custom request headers, use `plex_container_labels_traefik_additional_request_headers_custom`
+plex_container_labels_traefik_additional_request_headers: "{{ plex_container_labels_traefik_additional_request_headers_auto | combine(plex_container_labels_traefik_additional_request_headers_custom) }}"
+plex_container_labels_traefik_additional_request_headers_auto: {}
+plex_container_labels_traefik_additional_request_headers_custom: {}
+
+# Controls which additional headers to attach to all HTTP responses.
+# To add your own custom response headers, use `plex_container_labels_traefik_additional_response_headers_custom`
+plex_container_labels_traefik_additional_response_headers: "{{ plex_container_labels_traefik_additional_response_headers_auto | combine(plex_container_labels_traefik_additional_response_headers_custom) }}"
+plex_container_labels_traefik_additional_response_headers_auto: |
+  {{
+    {}
+    | combine ({'X-XSS-Protection': plex_http_header_xss_protection} if plex_http_header_xss_protection else {})
+    | combine ({'X-Content-Type-Options': plex_http_header_content_type_options} if plex_http_header_content_type_options else {})
+    | combine ({'Content-Security-Policy': plex_http_header_content_security_policy} if plex_http_header_content_security_policy else {})
+    | combine ({'Permissions-Policy': plex_http_header_permissions_policy} if plex_http_header_permissions_policy else {})
+    | combine ({'Strict-Transport-Security': plex_http_header_strict_transport_security} if plex_http_header_strict_transport_security and plex_container_labels_traefik_tls else {})
+  }}
+plex_container_labels_traefik_additional_response_headers_custom: {}
+
+# plex_container_labels_additional_labels contains a multiline string with additional labels to add to the container label file.
+# See `../templates/labels.j2` for details.
+# To add your own custom labels, use `plex_container_labels_additional_labels_custom`
+#
+# Example:
+# plex_container_labels_additional_labels_custom:
+#   - my.label=1
+#   - another.label="here"
+plex_container_labels_additional_labels: "{{ plex_container_labels_additional_labels_auto + plex_container_labels_additional_labels_custom }}"
+plex_container_labels_additional_labels_auto: []
+plex_container_labels_additional_labels_custom: []
+
+# A list of extra arguments to pass to the container (`docker create` command)
+plex_container_extra_arguments: "{{ plex_container_extra_arguments_auto + plex_container_extra_arguments_custom }}"
+plex_container_extra_arguments_auto: []
+plex_container_extra_arguments_custom: []
+
+# A list of extra arguments to pass to the process inside the container
+# Example: ['--SOME_ARGUMENT']
+plex_process_extra_arguments: "{{ plex_process_extra_arguments_auto + plex_process_extra_arguments_custom }}"
+plex_process_extra_arguments_auto: []
+plex_process_extra_arguments_custom: []
+
+# Specifies the value of the `X-XSS-Protection` header
+# Stops pages from loading when they detect reflected cross-site scripting (XSS) attacks.
+#
+# Learn more about it is here:
+# - https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-XSS-Protection
+# - https://portswigger.net/web-security/cross-site-scripting/reflected
+plex_http_header_xss_protection: "1; mode=block"
+
+# Specifies the value of the `X-Content-Type-Options` header.
+# See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options
+plex_http_header_content_type_options: nosniff
+
+# Specifies the value of the `Content-Security-Policy` header.
+# See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
+plex_http_header_content_security_policy: frame-ancestors 'self'
+
+# Specifies the value of the `Permissions-Policy` header.
+# See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy
+plex_http_header_permissions_policy: "{{ 'interest-cohort=()' if plex_floc_optout_enabled else '' }}"
+
+# Specifies the value of the `Strict-Transport-Security` header.
+# See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security
+plex_http_header_strict_transport_security: "max-age=31536000; includeSubDomains{{ '; preload' if plex_hsts_preload_enabled else '' }}"
+
+# Controls whether to send a "Permissions-Policy interest-cohort=();" header along with all responses
+#
+# Learn more about what it is here:
+# - https://www.eff.org/deeplinks/2021/03/googles-floc-terrible-idea
+# - https://paramdeo.com/blog/opting-your-website-out-of-googles-floc-network
+# - https://amifloced.org/
+#
+# Of course, a better solution is to just stop using browsers (like Chrome), which participate in such tracking practices.
+# See: `plex_http_header_permissions_policy`
+plex_floc_optout_enabled: true
+
+# Controls if HSTS preloading is enabled
+#
+# In its strongest and recommended form, the [HSTS policy](https://www.chromium.org/hsts) includes all subdomains, and
+# indicates a willingness to be "preloaded" into browsers:
+# `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload`
+# For more information visit:
+# - https://en.wikipedia.org/wiki/HTTP_Strict_Transport_Security
+# - https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security
+# - https://hstspreload.org/#opt-in
+# See: `plex_http_header_strict_transport_security`
+plex_hsts_preload_enabled: false
 
 # List of systemd services that the Plex systemd service depends on
 plex_systemd_required_services_list: "{{ (plex_systemd_required_services_list_default + plex_systemd_required_services_list_auto + plex_systemd_required_services_list_custom) | unique }}"
@@ -107,117 +266,6 @@ plex_systemd_wanted_services_list: "{{ (plex_systemd_wanted_services_list_defaul
 plex_systemd_wanted_services_list_default: []
 plex_systemd_wanted_services_list_auto: []
 plex_systemd_wanted_services_list_custom: []
-
-# The base container network. It will be auto-created by this role if it doesn't exist already.
-plex_container_network: "{{ plex_identifier }}"
-
-# Control if the container network is deleted on uninstalling.
-plex_container_network_deletion_enabled: true
-
-# For information on all the ports Plex may use, and what they do, see the below docs
-# https://github.com/linuxserver/docker-plex#optional-parameters
-
-# The port Plex is serving the HTTP web application on inside the container
-plex_container_http_port: 32400
-
-# Controls whether the container exposes the HTTP port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32400"), or empty string to not expose.
-plex_container_http_bind_port: ""
-
-# The port Plex is serving the DLNA server on inside the container
-plex_container_dlna_udp_port: 1900
-
-# Controls whether the container exposes the DLNA UDP port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:1900"), or empty string to not expose.
-plex_container_dlna_udp_bind_port: ""
-
-# The port Plex is serving the DLNA server on inside the container
-plex_container_dlna_tcp_port: 32469
-
-# Controls whether the container exposes the 32469 TCP port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32469"), or empty string to not expose.
-plex_container_dlna_tcp_bind_port: ""
-
-# The port Plex is serving the Bonjour/Avahi server on inside the container
-plex_container_bonjour_port: 5353
-
-# Controls whether the container exposes the Bonjour/Avahi port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:5353"), or empty string to not expose.
-plex_container_bonjour_bind_port: ""
-
-# The port Plex is serving the 'Plex for Roku via Plex Companion' server on inside the container
-plex_container_roku_port: 8324
-
-# Controls whether the container exposes the 'Plex for Roku via Plex Companion' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:8324"), or empty string to not expose.
-plex_container_roku_bind_port: ""
-
-# The port Plex is serving the 'GDM network discovery' server on inside the container
-plex_container_gdm_port_01: 32410
-
-# Controls whether the container exposes the 'GDM network discovery' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32410"), or empty string to not expose.
-plex_container_gdm_bind_port_01: ""
-
-# The port Plex is serving the 'GDM network discovery' server on inside the container
-plex_container_gdm_port_02: 32412
-
-# Controls whether the container exposes the 'GDM network discovery' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32412"), or empty string to not expose.
-plex_container_gdm_bind_port_02: ""
-
-# The port Plex is serving the 'GDM network discovery' server on inside the container
-plex_container_gdm_port_03: 32413
-
-# Controls whether the container exposes the 'GDM network discovery' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32413"), or empty string to not expose.
-plex_container_gdm_bind_port_03: ""
-
-# The port Plex is serving the 'GDM network discovery' server on inside the container
-plex_container_gdm_port_04: 32414
-
-# Controls whether the container exposes the 'GDM network discovery' port
-# Takes an "<ip>:<port>" or "<port>" value (e.g. "127.0.0.1:32414"), or empty string to not expose.
-plex_container_gdm_bind_port_04: ""
-
-# To inject your own other container labels, see `plex_container_labels_additional_labels`.
-plex_container_labels_traefik_enabled: true
-plex_container_labels_traefik_docker_network: "{{ plex_container_network }}"
-plex_container_labels_traefik_hostname: "{{ plex_hostname }}"
-# The path prefix must either be `/` or not end with a slash (e.g. `/plex`).
-plex_container_labels_traefik_path_prefix: "{{ plex_path_prefix }}"
-plex_container_labels_traefik_rule: "Host(`{{ plex_container_labels_traefik_hostname }}`){% if plex_container_labels_traefik_path_prefix != '/' %} && PathPrefix(`{{ plex_container_labels_traefik_path_prefix }}`){% endif %}"
-plex_container_labels_traefik_priority: 0
-plex_container_labels_traefik_entrypoints: web-secure
-plex_container_labels_traefik_tls: "{{ plex_container_labels_traefik_entrypoints != 'web' }}"
-plex_container_labels_traefik_tls_certResolver: default # noqa var-naming
-
-# plex_container_labels_additional_labels contains a multiline string with additional labels to add to the container label file.
-# See `../templates/labels.j2` for details.
-#
-# Example:
-# plex_container_labels_additional_labels: |
-#   my.label=1
-#   another.label="here"
-plex_container_labels_additional_labels: ""
-
-# A list of additional "volumes" to mount in the container.
-#
-# See the `--mount` documentation for the `docker run` command.
-#
-# Example:
-# plex_container_additional_volumes:
-#   - type: bind
-#     src: /path/on/the/host
-#     dst: /data
-#   - type: bind
-#     src: /another-path/on/the/host
-#     dst: /read-only
-#     options: readonly
-plex_container_additional_volumes: []
-
-# A list of extra arguments to pass to the container
-plex_container_extra_arguments: []
 
 # Controls how long to wait for the container to stop gracefully before killing it.
 plex_container_stop_grace_time_seconds: "{{ devture_systemd_docker_base_container_stop_grace_time_seconds }}"
@@ -250,8 +298,45 @@ plex_container_cleanup_command: |
   echo "Failed to remove stale container {{ plex_identifier }} after {{ plex_container_cleanup_timeout_seconds }} attempts" >&2;
   exit 1
 
+# Controls whether the container filesystem is read-only
+# To enable runtime update of Plex (and thus Plexpass builds) this value must be false
+plex_container_read_only: true
+
+# Since the container is NOT run in 'host' networking mode
+# it is required that a claim token be provided during first time setup
+#
+# Link to obtain -> https://plex.tv/claim
+# Keep in mind that the claim token expires after 4 minutes.
+plex_environment_variables_plex_claim: ""
+
+# The container runtime that the container engine should use
+# Should be set to 'nvidia' to enable NVIDIA GPU hardware acceleration,
+# NOTE -> Requires that the https://github.com/NVIDIA/nvidia-container-toolkit is installed
+#
+# If blank the default runtime is used
+# https://docs.linuxserver.io/images/docker-plex/#nvidia
+plex_container_runtime: ""
+
+# To enable NVIDIA GPU hardware acceleration this value should either be 'all' or the UUID value of the GPU
+# which can obtained with the command -> 'nvidia-smi --query-gpu=gpu_name,gpu_uuid --format=csv'
+#
+# https://docs.linuxserver.io/images/docker-plex/#nvidia
+plex_environment_variables_nvidia_visible_devices: ""
+
 # Specify the timezone
-plex_timezone: "Etc/UTC"
+plex_environment_variables_tz: "Etc/UTC"
+
+# Valid settings for 'plex_environment_variables_version' are:
+#
+# 1. docker: Let Docker handle the Plex Version, we keep our Dockerhub Endpoint up to date with the latest public builds.
+# 2. latest: will update plex to the latest version available that you are entitled to.
+# 3. public: will update plexpass users to the latest public version, useful for plexpass users that don't want to be on the bleeding edge but still want the latest public updates.
+# 4. <specific-version>: will select a specific version (eg 0.9.12.4.1192-9a47d21) of plex to install, note you cannot use this to access plexpass versions if you do not have plexpass.
+#
+# NOTE -> You cannot update to a PlexPass only (beta) version if you are not logged in with a PlexPass account
+# NOTE -> You must set 'plex_container_read_only' to false if you set a value that is not 'docker'
+# https://github.com/linuxserver/docker-plex#application-setup
+plex_environment_variables_version: docker
 
 # plex_environment_variables_additional_variables contains a multiline string with additional environment variables to pass to the container.
 #
