@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 # SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Suguru Hirahara
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -35,19 +36,6 @@
           # nested-container isolation without the copying.
           storage-driver: fuse-overlayfs
 
-    # The role connects the container to the networks listed in
-    # `plex_container_additional_networks` but deliberately does not create
-    # them, so an inert implementation of that variable would go unnoticed
-    # unless the network exists and can be checked for afterwards.
-    - name: Ensure the extra container network for Plex Molecule tests exists
-      ansible.builtin.command:
-        cmd: "docker network create {{ plex_molecule_extra_network }}"
-      register: plex_molecule_extra_network_result
-      changed_when: plex_molecule_extra_network_result.rc == 0
-      failed_when: >-
-        plex_molecule_extra_network_result.rc != 0
-        and 'already exists' not in plex_molecule_extra_network_result.stderr
-
     # Bind-mounted into the Plex container through
     # `plex_container_additional_volumes`. The role does not create the source
     # of an additional volume, so it has to exist before the container is
@@ -65,3 +53,16 @@
         content: "{{ plex_molecule_extra_volume_marker }}\n"
         dest: "{{ plex_molecule_extra_volume_src }}/{{ plex_molecule_marker_filename }}"
         mode: "0644"
+
+    # The role connects the container to the networks listed in
+    # `plex_container_additional_networks` but deliberately does not create
+    # them, so an inert implementation of that variable would go unnoticed
+    # unless the network exists and can be checked for afterwards.
+    - name: Ensure the extra container network for Plex Molecule tests exists
+      ansible.builtin.command:
+        cmd: "docker network create {{ plex_molecule_extra_network }}"
+      register: plex_molecule_extra_network_result
+      changed_when: plex_molecule_extra_network_result.rc == 0
+      failed_when: >-
+        plex_molecule_extra_network_result.rc != 0
+        and 'already exists' not in plex_molecule_extra_network_result.stderr
