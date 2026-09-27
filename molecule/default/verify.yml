@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Slavi Pantaleev
 # SPDX-FileCopyrightText: 2026 spatterlight
+# SPDX-FileCopyrightText: 2026 Suguru Hirahara
 #
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -282,23 +283,44 @@
               Container port {{ plex_defaults.plex_container_http_port }} is published on
               {{ plex_container_http_host_bind_port }}, and no port the role was not asked to publish is
 
-        # Four roles in this fleet accepted `*_container_additional_volumes` and
-        # then dropped it on the floor, so this checks both that the entry became a
-        # real `--mount` with its `readonly` option honoured, and that the mount
-        # actually carries data through.
-        - name: Assert the data, media and additional volumes became real mounts
+        - name: Collect the mounts the role asked for
+          ansible.builtin.set_fact:
+            plex_config_mount: "{{ plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | list }}"
+            plex_media_mount: "{{ plex_container.Mounts | selectattr('Destination', 'equalto', plex_media_bind_path) | list }}"
+            plex_extra_mount: "{{ plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | list }}"
+
+        - name: Assert that the role's data path is mounted at /config
           ansible.builtin.assert:
             that:
-              - plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | list | length == 1
-              - (plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | first).Source == plex_molecule_data_path
-              - plex_container.Mounts | selectattr('Destination', 'equalto', plex_media_bind_path) | list | length == 1
-              - plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | list | length == 1
-              - >-
-                (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | first).Source
-                == plex_molecule_extra_volume_src
-              - not (plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | first).RW
-            fail_msg: "The role's volumes did not turn into the expected mounts: {{ plex_container.Mounts }}"
-            success_msg: "The data path, the media path and plex_container_additional_volumes all became real mounts"
+              - plex_config_mount | length == 1
+              - plex_config_mount[0].Type == 'bind'
+              - plex_config_mount[0].RW
+              - plex_config_mount[0].Source == plex_molecule_data_path
+            fail_msg: "The role's data path is not bind-mounted at /config: {{ plex_container.Mounts }}"
+            success_msg: "{{ plex_config_mount[0].Source | default('?') }} is bind-mounted at /config"
+
+        - name: Assert that the role's media path is mounted at /media
+          ansible.builtin.assert:
+            that:
+              - plex_media_mount | length == 1
+              - plex_media_mount[0].Type == 'bind'
+              - plex_media_mount[0].RW
+            fail_msg: "The role's data path is not bind-mounted at /media: {{ plex_container.Mounts }}"
+            success_msg: "{{ plex_media_mount[0].Source | default('?') }} is bind-mounted at /media"
+
+        # plex_container_additional_volumes has been inert in several roles in
+        # this collection - rendered into a comment, or into a `-v` that silently
+        # dropped the options. Both the destination and the readonly option have
+        # to arrive.
+        - name: Assert that plex_container_additional_volumes reached the container
+          ansible.builtin.assert:
+            that:
+              - plex_extra_mount | length == 1
+              - plex_extra_mount[0].Type == 'bind'
+              - plex_extra_mount[0].Source == plex_molecule_extra_volume_src
+              - not plex_extra_mount[0].RW
+            fail_msg: "The additional volume did not reach the container: {{ plex_container.Mounts }}"
+            success_msg: "The additional volume is mounted read-only at {{ plex_molecule_extra_volume_dst }}"
 
         # Reading the file back from inside the
         # container is the difference between the variable existing and it working.
