@@ -111,6 +111,81 @@
         # What `docker create` was actually told
         # ------------------------------------------------------------------
 
+        - name: Collect the mounts the role asked for
+          ansible.builtin.set_fact:
+            plex_config_mount: "{{ plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | list }}"
+            plex_media_mount: "{{ plex_container.Mounts | selectattr('Destination', 'equalto', plex_media_bind_path) | list }}"
+            plex_extra_mount: "{{ plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | list }}"
+
+        - name: Assert that the role's data path is mounted at /config
+          ansible.builtin.assert:
+            that:
+              - plex_config_mount | length == 1
+              - plex_config_mount[0].Type == 'bind'
+              - plex_config_mount[0].RW
+              - plex_config_mount[0].Source == plex_molecule_data_path
+            fail_msg: "The role's data path is not bind-mounted at /config: {{ plex_container.Mounts }}"
+            success_msg: "{{ plex_config_mount[0].Source | default('?') }} is bind-mounted at /config"
+
+        - name: Assert that the role's media path is mounted at /media
+          ansible.builtin.assert:
+            that:
+              - plex_media_mount | length == 1
+              - plex_media_mount[0].Type == 'bind'
+              - plex_media_mount[0].RW
+            fail_msg: "The role's data path is not bind-mounted at /media: {{ plex_container.Mounts }}"
+            success_msg: "{{ plex_media_mount[0].Source | default('?') }} is bind-mounted at /media"
+
+        # plex_container_additional_volumes has been inert in several roles in
+        # this collection - rendered into a comment, or into a `-v` that silently
+        # dropped the options. Both the destination and the readonly option have
+        # to arrive.
+        - name: Assert that plex_container_additional_volumes reached the container
+          ansible.builtin.assert:
+            that:
+              - plex_extra_mount | length == 1
+              - plex_extra_mount[0].Type == 'bind'
+              - plex_extra_mount[0].Source == plex_molecule_extra_volume_src
+              - not plex_extra_mount[0].RW
+            fail_msg: "The additional volume did not reach the container: {{ plex_container.Mounts }}"
+            success_msg: "The additional volume is mounted read-only at {{ plex_molecule_extra_volume_dst }}"
+
+        # Reading the file back from inside the
+        # container is the difference between the variable existing and it working.
+        - name: Read the marker through the additional volume
+          ansible.builtin.command:
+            cmd: >-
+              docker exec plex
+              cat {{ plex_molecule_extra_volume_dst }}/{{ plex_molecule_marker_filename }}
+          register: plex_extra_volume
+          changed_when: false
+
+        - name: Assert the additional volume is mounted into the Plex container
+          ansible.builtin.assert:
+            that:
+              - plex_extra_volume.rc == 0
+              - plex_extra_volume.stdout | trim == plex_molecule_extra_volume_marker
+            fail_msg: "The additional volume did not carry the marker into the container"
+            success_msg: "The additional volume carries the marker into the container"
+
+        # The `docker create` line in templates/systemd/plex.service.j2 has a
+        # comment sitting in the middle of a backslash continuation, right in front
+        # of the tmpfs that linuxserver.io's read-only mode needs. systemd drops
+        # such a comment rather than passing it on to docker, but that is worth
+        # holding onto: if it ever stopped doing so, everything after the comment
+        # would silently become part of the image name.
+        - name: Assert that the read-only container still gets its writable /run
+          ansible.builtin.assert:
+            that:
+              - plex_container.HostConfig.ReadonlyRootfs
+              - "'/run' in (plex_container.HostConfig.Tmpfs | default({}))"
+              - "'exec' in plex_container.HostConfig.Tmpfs['/run']"
+            fail_msg: >-
+              The container's root filesystem is
+              {{ 'read-only' if plex_container.HostConfig.ReadonlyRootfs else 'writable' }}
+              and its tmpfs mounts are {{ plex_container.HostConfig.Tmpfs | default({}) }}
+            success_msg: "The container is read-only with an exec tmpfs at /run"
+
         - name: Assert that the role's uid and gid reached the container
           ansible.builtin.assert:
             that:
@@ -150,6 +225,93 @@
             that: plex_container.Config.Labels['org.opencontainers.image.version'].startswith(plex_defaults.plex_version)
             fail_msg: "Plex reports {{ plex_container.Config.Labels['org.opencontainers.image.version'] | default('none') }}, expected {{ plex_defaults.plex_version }}"
             success_msg: "Plex reports {{ plex_container.Config.Labels['org.opencontainers.image.version'] }}"
+
+        # ------------------------------------------------------------------
+        # Traefik labels
+        # ------------------------------------------------------------------
+
+        - name: Assert that the Traefik labels describe the configured hostname and path prefix
+          ansible.builtin.assert:
+            that:
+              - plex_container.Config.Labels['traefik.enable'] == 'true'
+              - plex_container.Config.Labels['traefik.http.routers.plex.rule'] == 'Host(`' ~ plex_expected_hostname ~ '`) && PathPrefix(`' ~ plex_expected_path_prefix ~ '`)'
+              - plex_container.Config.Labels['traefik.http.middlewares.plex-strip-prefix.stripprefix.prefixes'] == plex_expected_path_prefix
+              - plex_container.Config.Labels['traefik.http.services.plex.loadbalancer.server.port'] == '32400'
+            fail_msg: "The Traefik labels are not what templates/labels.j2 should have produced: {{ plex_container.Config.Labels }}"
+            success_msg: "The Traefik labels route {{ plex_expected_hostname }}{{ plex_expected_path_prefix }} to port 32400"
+
+        - name: Assert that the additional labels and extra arguments reached the container
+          ansible.builtin.assert:
+            that:
+              - plex_container.Config.Labels['mash.molecule.additional-label'] == 'set-by-the-role'
+              - plex_container.Config.Labels['mash.molecule.extra-argument'] == 'set-by-the-role'
+            fail_msg: >-
+              plex_container_labels_additional_labels or
+              plex_container_extra_arguments did not reach the container:
+              {{ plex_container.Config.Labels }}
+            success_msg: "The additional label and the extra argument both reached the container"
+
+        # ------------------------------------------------------------------
+        # What the process inside the container actually sees
+        # ------------------------------------------------------------------
+
+        - name: Ask the Plex container which timezone and user it is running in
+          ansible.builtin.command:
+            cmd: docker exec plex sh -c 'date +%Z; id -u; id -g'
+          register: plex_process_identity
+          changed_when: false
+
+        - name: Assert that the Plex process runs in the role's timezone, as the role's user
+          ansible.builtin.assert:
+            that:
+              - plex_process_identity.stdout_lines[0] == plex_expected_timezone_abbreviation
+              - plex_process_identity.stdout_lines[1] == plex_expected_uid | string
+              - plex_process_identity.stdout_lines[2] == plex_expected_gid | string
+            fail_msg: >-
+              The container reports zone/uid/gid {{ plex_process_identity.stdout_lines }},
+              expected [{{ plex_expected_timezone_abbreviation }},
+              {{ plex_expected_uid }}, {{ plex_expected_gid }}]
+            success_msg: >-
+              The Plex process runs in {{ plex_process_identity.stdout_lines[0] }}
+              as {{ plex_process_identity.stdout_lines[1] }}:{{ plex_process_identity.stdout_lines[2] }}
+
+        # ------------------------------------------------------------------
+        # Network
+        # ------------------------------------------------------------------
+
+        - name: Assert the ports the role published are the ports the role was given
+          ansible.builtin.assert:
+            that:
+              - >-
+                plex_container.NetworkSettings.Ports[plex_defaults.plex_container_http_port | string ~ '/tcp']
+                | map(attribute='HostPort') | list == [plex_molecule_http_port]
+              - >-
+                plex_container.NetworkSettings.Ports[plex_defaults.plex_container_http_port | string ~ '/tcp']
+                | map(attribute='HostIp') | list == ['127.0.0.1']
+              - >-
+                plex_container.NetworkSettings.Ports[plex_defaults.plex_container_dlna_tcp_port | string ~ '/tcp']
+                | map(attribute='HostPort') | list == [plex_container_dlna_tcp_bind_port.split(':') | last]
+              # Nothing asked for the DLNA UDP, Bonjour, Roku or GDM ports to be
+              # published, so they must stay as the image exposes them: present in
+              # the port map, with no host binding at all.
+              - plex_container.NetworkSettings.Ports['1900/udp'] is none
+              - plex_container.NetworkSettings.Ports['5353/udp'] is none
+              - plex_container.NetworkSettings.Ports['8324/tcp'] is none
+              - plex_container.NetworkSettings.Ports['32410/udp'] is none
+            fail_msg: "The published ports are not what the role was configured for: {{ plex_container.NetworkSettings.Ports }}"
+            success_msg: >-
+              Container port {{ plex_defaults.plex_container_http_port }} is published on
+              {{ plex_container_http_host_bind_port }}, and no port the role was not asked to publish is
+
+        - name: Assert the container joined both its own network and the additional one
+          ansible.builtin.assert:
+            that:
+              - plex_defaults.plex_identifier in plex_container.NetworkSettings.Networks
+              - plex_molecule_extra_network in plex_container.NetworkSettings.Networks
+            fail_msg: >-
+              The container is on {{ plex_container.NetworkSettings.Networks.keys() | list }},
+              which is not the base network plus {{ plex_molecule_extra_network }}
+            success_msg: "The container is on its own network and on {{ plex_molecule_extra_network }}"
 
         # ------------------------------------------------------------------
         #
@@ -248,6 +410,15 @@
               not by {{ plex_uid }}:{{ plex_gid }}
             success_msg: "Plex wrote its preferences as {{ plex_uid }}:{{ plex_gid }}"
 
+        # ------------------------------------------------------------------
+        # Environment variables
+        # ------------------------------------------------------------------
+
+        - name: Read the env file the role rendered
+          ansible.builtin.slurp:
+            src: "/{{ plex_defaults.plex_identifier }}/env"
+          register: plex_env_file
+
         - name: Assert the role's environment reached the container
           ansible.builtin.assert:
             that:
@@ -258,173 +429,6 @@
               - plex_container.Config.Env | select('match', 'PLEX_CLAIM') | list | length == 0
             fail_msg: "The container environment is not what templates/env.j2 should have produced: {{ plex_container.Config.Env }}"
             success_msg: "The container environment is the one templates/env.j2 produced"
-
-        - name: Assert the ports the role published are the ports the role was given
-          ansible.builtin.assert:
-            that:
-              - >-
-                plex_container.NetworkSettings.Ports[plex_defaults.plex_container_http_port | string ~ '/tcp']
-                | map(attribute='HostPort') | list == [plex_molecule_http_port]
-              - >-
-                plex_container.NetworkSettings.Ports[plex_defaults.plex_container_http_port | string ~ '/tcp']
-                | map(attribute='HostIp') | list == ['127.0.0.1']
-              - >-
-                plex_container.NetworkSettings.Ports[plex_defaults.plex_container_dlna_tcp_port | string ~ '/tcp']
-                | map(attribute='HostPort') | list == [plex_container_dlna_tcp_bind_port.split(':') | last]
-              # Nothing asked for the DLNA UDP, Bonjour, Roku or GDM ports to be
-              # published, so they must stay as the image exposes them: present in
-              # the port map, with no host binding at all.
-              - plex_container.NetworkSettings.Ports['1900/udp'] is none
-              - plex_container.NetworkSettings.Ports['5353/udp'] is none
-              - plex_container.NetworkSettings.Ports['8324/tcp'] is none
-              - plex_container.NetworkSettings.Ports['32410/udp'] is none
-            fail_msg: "The published ports are not what the role was configured for: {{ plex_container.NetworkSettings.Ports }}"
-            success_msg: >-
-              Container port {{ plex_defaults.plex_container_http_port }} is published on
-              {{ plex_container_http_host_bind_port }}, and no port the role was not asked to publish is
-
-        - name: Collect the mounts the role asked for
-          ansible.builtin.set_fact:
-            plex_config_mount: "{{ plex_container.Mounts | selectattr('Destination', 'equalto', '/config') | list }}"
-            plex_media_mount: "{{ plex_container.Mounts | selectattr('Destination', 'equalto', plex_media_bind_path) | list }}"
-            plex_extra_mount: "{{ plex_container.Mounts | selectattr('Destination', 'equalto', plex_molecule_extra_volume_dst) | list }}"
-
-        - name: Assert that the role's data path is mounted at /config
-          ansible.builtin.assert:
-            that:
-              - plex_config_mount | length == 1
-              - plex_config_mount[0].Type == 'bind'
-              - plex_config_mount[0].RW
-              - plex_config_mount[0].Source == plex_molecule_data_path
-            fail_msg: "The role's data path is not bind-mounted at /config: {{ plex_container.Mounts }}"
-            success_msg: "{{ plex_config_mount[0].Source | default('?') }} is bind-mounted at /config"
-
-        - name: Assert that the role's media path is mounted at /media
-          ansible.builtin.assert:
-            that:
-              - plex_media_mount | length == 1
-              - plex_media_mount[0].Type == 'bind'
-              - plex_media_mount[0].RW
-            fail_msg: "The role's data path is not bind-mounted at /media: {{ plex_container.Mounts }}"
-            success_msg: "{{ plex_media_mount[0].Source | default('?') }} is bind-mounted at /media"
-
-        # plex_container_additional_volumes has been inert in several roles in
-        # this collection - rendered into a comment, or into a `-v` that silently
-        # dropped the options. Both the destination and the readonly option have
-        # to arrive.
-        - name: Assert that plex_container_additional_volumes reached the container
-          ansible.builtin.assert:
-            that:
-              - plex_extra_mount | length == 1
-              - plex_extra_mount[0].Type == 'bind'
-              - plex_extra_mount[0].Source == plex_molecule_extra_volume_src
-              - not plex_extra_mount[0].RW
-            fail_msg: "The additional volume did not reach the container: {{ plex_container.Mounts }}"
-            success_msg: "The additional volume is mounted read-only at {{ plex_molecule_extra_volume_dst }}"
-
-        # Reading the file back from inside the
-        # container is the difference between the variable existing and it working.
-        - name: Read the marker through the additional volume
-          ansible.builtin.command:
-            cmd: >-
-              docker exec plex
-              cat {{ plex_molecule_extra_volume_dst }}/{{ plex_molecule_marker_filename }}
-          register: plex_extra_volume
-          changed_when: false
-
-        - name: Assert the additional volume is mounted into the Plex container
-          ansible.builtin.assert:
-            that:
-              - plex_extra_volume.rc == 0
-              - plex_extra_volume.stdout | trim == plex_molecule_extra_volume_marker
-            fail_msg: "The additional volume did not carry the marker into the container"
-            success_msg: "The additional volume carries the marker into the container"
-
-        # The `docker create` line in templates/systemd/plex.service.j2 has a
-        # comment sitting in the middle of a backslash continuation, right in front
-        # of the tmpfs that linuxserver.io's read-only mode needs. systemd drops
-        # such a comment rather than passing it on to docker, but that is worth
-        # holding onto: if it ever stopped doing so, everything after the comment
-        # would silently become part of the image name.
-        - name: Assert that the read-only container still gets its writable /run
-          ansible.builtin.assert:
-            that:
-              - plex_container.HostConfig.ReadonlyRootfs
-              - "'/run' in (plex_container.HostConfig.Tmpfs | default({}))"
-              - "'exec' in plex_container.HostConfig.Tmpfs['/run']"
-            fail_msg: >-
-              The container's root filesystem is
-              {{ 'read-only' if plex_container.HostConfig.ReadonlyRootfs else 'writable' }}
-              and its tmpfs mounts are {{ plex_container.HostConfig.Tmpfs | default({}) }}
-            success_msg: "The container is read-only with an exec tmpfs at /run"
-
-        - name: Assert the container joined both its own network and the additional one
-          ansible.builtin.assert:
-            that:
-              - plex_defaults.plex_identifier in plex_container.NetworkSettings.Networks
-              - plex_molecule_extra_network in plex_container.NetworkSettings.Networks
-            fail_msg: >-
-              The container is on {{ plex_container.NetworkSettings.Networks.keys() | list }},
-              which is not the base network plus {{ plex_molecule_extra_network }}
-            success_msg: "The container is on its own network and on {{ plex_molecule_extra_network }}"
-
-        # ------------------------------------------------------------------
-        # Traefik labels
-        # ------------------------------------------------------------------
-
-        - name: Assert that the Traefik labels describe the configured hostname and path prefix
-          ansible.builtin.assert:
-            that:
-              - plex_container.Config.Labels['traefik.enable'] == 'true'
-              - plex_container.Config.Labels['traefik.http.routers.plex.rule'] == 'Host(`' ~ plex_expected_hostname ~ '`) && PathPrefix(`' ~ plex_expected_path_prefix ~ '`)'
-              - plex_container.Config.Labels['traefik.http.middlewares.plex-strip-prefix.stripprefix.prefixes'] == plex_expected_path_prefix
-              - plex_container.Config.Labels['traefik.http.services.plex.loadbalancer.server.port'] == '32400'
-            fail_msg: "The Traefik labels are not what templates/labels.j2 should have produced: {{ plex_container.Config.Labels }}"
-            success_msg: "The Traefik labels route {{ plex_expected_hostname }}{{ plex_expected_path_prefix }} to port 32400"
-
-        - name: Assert that the additional labels and extra arguments reached the container
-          ansible.builtin.assert:
-            that:
-              - plex_container.Config.Labels['mash.molecule.additional-label'] == 'set-by-the-role'
-              - plex_container.Config.Labels['mash.molecule.extra-argument'] == 'set-by-the-role'
-            fail_msg: >-
-              plex_container_labels_additional_labels or
-              plex_container_extra_arguments did not reach the container:
-              {{ plex_container.Config.Labels }}
-            success_msg: "The additional label and the extra argument both reached the container"
-
-        # ------------------------------------------------------------------
-        # What the process inside the container actually sees
-        # ------------------------------------------------------------------
-
-        - name: Ask the Plex container which timezone and user it is running in
-          ansible.builtin.command:
-            cmd: docker exec plex sh -c 'date +%Z; id -u; id -g'
-          register: plex_process_identity
-          changed_when: false
-
-        - name: Assert that the Plex process runs in the role's timezone, as the role's user
-          ansible.builtin.assert:
-            that:
-              - plex_process_identity.stdout_lines[0] == plex_expected_timezone_abbreviation
-              - plex_process_identity.stdout_lines[1] == plex_expected_uid | string
-              - plex_process_identity.stdout_lines[2] == plex_expected_gid | string
-            fail_msg: >-
-              The container reports zone/uid/gid {{ plex_process_identity.stdout_lines }},
-              expected [{{ plex_expected_timezone_abbreviation }},
-              {{ plex_expected_uid }}, {{ plex_expected_gid }}]
-            success_msg: >-
-              The Plex process runs in {{ plex_process_identity.stdout_lines[0] }}
-              as {{ plex_process_identity.stdout_lines[1] }}:{{ plex_process_identity.stdout_lines[2] }}
-
-        # ------------------------------------------------------------------
-        # Verify environment variables reach Plex
-        # ------------------------------------------------------------------
-
-        - name: Read the env file the role rendered
-          ansible.builtin.slurp:
-            src: "/{{ plex_defaults.plex_identifier }}/env"
-          register: plex_env_file
 
         - name: Assert no claim token is written when none is configured
           ansible.builtin.assert:
