@@ -282,16 +282,6 @@
               Container port {{ plex_defaults.plex_container_http_port }} is published on
               {{ plex_container_http_host_bind_port }}, and no port the role was not asked to publish is
 
-        - name: Assert the container filesystem is read-only, with a writable /run
-          ansible.builtin.assert:
-            that:
-              - plex_container.HostConfig.ReadonlyRootfs
-              - "'/run' in plex_container.HostConfig.Tmpfs"
-            fail_msg: >-
-              plex_container_read_only did not produce a read-only root filesystem with a tmpfs /run
-              (ReadonlyRootfs={{ plex_container.HostConfig.ReadonlyRootfs }}, Tmpfs={{ plex_container.HostConfig.Tmpfs }})
-            success_msg: "The container runs read-only with a tmpfs /run, as plex_container_read_only asks"
-
         # Four roles in this fleet accepted `*_container_additional_volumes` and
         # then dropped it on the floor, so this checks both that the entry became a
         # real `--mount` with its `readonly` option honoured, and that the mount
@@ -327,6 +317,24 @@
               - plex_extra_volume.stdout | trim == plex_molecule_extra_volume_marker
             fail_msg: "The additional volume did not carry the marker into the container"
             success_msg: "The additional volume carries the marker into the container"
+
+        # The `docker create` line in templates/systemd/plex.service.j2 has a
+        # comment sitting in the middle of a backslash continuation, right in front
+        # of the tmpfs that linuxserver.io's read-only mode needs. systemd drops
+        # such a comment rather than passing it on to docker, but that is worth
+        # holding onto: if it ever stopped doing so, everything after the comment
+        # would silently become part of the image name.
+        - name: Assert that the read-only container still gets its writable /run
+          ansible.builtin.assert:
+            that:
+              - plex_container.HostConfig.ReadonlyRootfs
+              - "'/run' in (plex_container.HostConfig.Tmpfs | default({}))"
+              - "'exec' in plex_container.HostConfig.Tmpfs['/run']"
+            fail_msg: >-
+              The container's root filesystem is
+              {{ 'read-only' if plex_container.HostConfig.ReadonlyRootfs else 'writable' }}
+              and its tmpfs mounts are {{ plex_container.HostConfig.Tmpfs | default({}) }}
+            success_msg: "The container is read-only with an exec tmpfs at /run"
 
         - name: Assert the container joined both its own network and the additional one
           ansible.builtin.assert:
