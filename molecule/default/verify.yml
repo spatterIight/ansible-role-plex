@@ -136,11 +136,11 @@
             fail_msg: "The role's data path is not bind-mounted at /media: {{ plex_container.Mounts }}"
             success_msg: "{{ plex_media_mount[0].Source | default('?') }} is bind-mounted at /media"
 
-        # plex_container_additional_volumes has been inert in several roles in
+        # plex_container_additional_volumes_custom has been inert in several roles in
         # this collection - rendered into a comment, or into a `-v` that silently
         # dropped the options. Both the destination and the readonly option have
         # to arrive.
-        - name: Assert that plex_container_additional_volumes reached the container
+        - name: Assert that plex_container_additional_volumes_custom reached the container
           ansible.builtin.assert:
             that:
               - plex_extra_mount | length == 1

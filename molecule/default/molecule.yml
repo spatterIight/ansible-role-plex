@@ -41,7 +41,7 @@ provisioner:
         plex_molecule_data_path: /plex/data
 
         # The host directory mounted into the container through
-        # `jackett_container_additional_volumes`, and the file placed in it by
+        # `jackett_container_additional_volumes_custom`, and the file placed in it by
         # prepare.yml. Reading that file from inside the container is what
         # proves the additional volumes reach the systemd unit rather than
         # being merely declared in defaults/main.yml.
@@ -94,7 +94,7 @@ provisioner:
         plex_container_additional_networks_custom:
           - plex-molecule-extra
 
-        plex_container_additional_volumes:
+        plex_container_additional_volumes_custom:
           - type: bind
             src: "{{ plex_molecule_extra_volume_src }}"
             dst: "{{ plex_molecule_extra_volume_dst }}"
